@@ -92,7 +92,7 @@ CarpiNova-Knowledge
 Versionado semántico:
 
 - `0.x`: esquema y contenido aún evolutivos;
-- `1.0`: primera base revisada y estable;
+- `1.0`: primera base revisada con cobertura completa del libro y conflictos/documentos pendientes explícitamente reportados;
 - posteriores versiones incrementan contenido, reglas o correcciones.
 
 ## 5. Estructura del repositorio
@@ -122,7 +122,7 @@ CarpiNova-Knowledge/
 │       ├── index.json
 │       ├── batches/
 │       └── pages/
-│           ├── p0001/
+│           ├── pdf-0001/
 │           │   ├── page.json
 │           │   ├── source.md
 │           │   ├── normalized.md
@@ -166,12 +166,15 @@ Cada página debe distinguir como mínimo:
   "book_id": "cpnc-2025",
   "pdf_page": 94,
   "printed_page": 91,
+  "printed_label": "91",
   "chapter": "Herrajes",
   "section": "Bisagras y correderas"
 }
 ```
 
-`pdf_page` es la posición física dentro del archivo. `printed_page` es la numeración impresa visible en el libro. Nunca se asume que son iguales.
+`pdf_page` es la posición física 1-based dentro del archivo y es el identificador estable de la página. `printed_page` es la numeración impresa visible cuando sea numérica. `printed_label` conserva etiquetas no numéricas si existieran. Para portadas, separadores u otras páginas sin número impreso, `printed_page` será `null`.
+
+Nunca se asume que `pdf_page` y `printed_page` son iguales.
 
 La F0.1 debe construir `page-map.json` antes de procesar masivamente el libro.
 
@@ -209,7 +212,7 @@ Versión diseñada para principiantes:
 - advertencias claras;
 - explicación de “qué”, “para qué” y “por qué” cuando la fuente lo permita.
 
-Si para aclarar un vacío técnico hiciera falta una fuente externa, esa ampliación no se integra silenciosamente: se registra aparte como `external_enrichment`.
+Cada bloque de `learning_text` debe declarar los `content_id` de los que deriva. Si para aclarar un vacío técnico hiciera falta una fuente externa, esa ampliación no se integra silenciosamente: se registra aparte como `external_enrichment`.
 
 ## 8. Modelo de contenido
 
@@ -279,7 +282,9 @@ Los dibujos y diagramas son datos de primera clase.
 - generar texto alternativo accesible;
 - comprobar qué medidas/relaciones muestra.
 
-No se garantiza que toda figura sea regenerable automáticamente desde F1, pero su especificación debe conservar la información necesaria para poder hacerlo sin volver a interpretar desde cero la página original.
+No se pretende describir cada píxel. Se pretende conservar **semántica, geometría relevante, relaciones, cotas, composición y secuencia pedagógica**.
+
+No se garantiza que toda figura sea regenerable automáticamente desde F1, pero su especificación debe conservar la información necesaria para poder planificar una reconstrucción sin volver a interpretar semánticamente desde cero la página original.
 
 ### 10.2 Tipos
 
@@ -295,11 +300,17 @@ No se garantiza que toda figura sea regenerable automáticamente desde F1, pero 
 - `3d_reference`
 - `mixed`
 
-### 10.3 Campos mínimos
+### 10.3 Identidad y campos mínimos
+
+Los IDs de figuras se basan en `pdf_page`, no en la numeración impresa:
+
+`FIG-CPNC-2025-PDF0094-001`
+
+Ejemplo:
 
 ```json
 {
-  "figure_id": "FIG-CPNC-2025-P0091-001",
+  "figure_id": "FIG-CPNC-2025-PDF0094-001",
   "type": "technical_diagram",
   "purpose": "Mostrar la instalación de una corredera telescópica",
   "source": {},
@@ -418,7 +429,7 @@ Toda medida técnica se extrae como objeto independiente:
 
 ```json
 {
-  "measurement_id": "MEAS-P0091-001",
+  "measurement_id": "MEAS-PDF0094-001",
   "kind": "diameter",
   "value": 35,
   "unit": "mm",
@@ -554,7 +565,7 @@ Puntuación propuesta por página:
 - formulario: +2;
 - lista de corte/despiece: +3;
 - múltiples medidas/fórmulas: +3;
-- OCR difícil: +2;
+- OCR difícil: +2.
 
 Un lote debería mantenerse aproximadamente en 18–24 puntos de complejidad.
 
@@ -570,7 +581,7 @@ Después de aprobar esta especificación:
 2. añadir README y estructura mínima;
 3. definir política editorial y de fuentes;
 4. prohibir subida automática del PDF fuente al repositorio;
-5. configurar validación básica de JSON.
+5. configurar validación básica de JSON Schema Draft 2020-12.
 
 **Salida:** repositorio listo para conocimiento.
 
@@ -612,7 +623,7 @@ No comenzar por introducciones fáciles. El piloto debe contener texto, figuras,
 
 Rango candidato: alrededor de las páginas impresas **88–95**, sujeto a confirmación de `page-map.json`.
 
-La página impresa 91 del libro ya contiene información de instalación de bisagra de cazoleta, perforación de 35 mm, ubicación, cantidad de bisagras, correderas y clasificación de cierre; por tanto es un buen ejemplo de contenido mixto para estresar el esquema.
+La página impresa 91 del libro contiene información de instalación de bisagra de cazoleta, perforación de 35 mm, ubicación, cantidad de bisagras, correderas y clasificación de cierre; por tanto es un buen ejemplo de contenido mixto para estresar el esquema.
 
 Procesar aproximadamente 4–8 páginas según complejidad real.
 
@@ -631,12 +642,12 @@ Después del piloto:
 
 ### F1.0 — Extracción sistemática
 
-Procesar el libro por lotes adaptativos.
+Procesar el libro por lotes adaptativos hasta cubrir el **100 % de las páginas físicas del PDF**, incluidas portadas, separadores y anexos. Las páginas sin contenido técnico se clasifican, pero no requieren contenido inventado.
 
 Cada lote produce:
 
 - páginas estructuradas;
-- source/normalized/learning text;
+- source/normalized/learning text cuando aplique;
 - figuras;
 - measurements;
 - rule candidates;
@@ -671,18 +682,34 @@ Consolidar contenidos repetidos por:
 
 Mantener todas las fuentes.
 
-### F1.3 — Knowledge Release 0.1
+### F1.3 — Knowledge Release 0.x
 
-Cuando exista una cobertura significativa y revisada:
+Durante la extracción se podrán publicar releases internas parciales para probar consumo desde herramientas futuras. Toda release parcial debe declarar explícitamente su cobertura.
 
-- construir `dist/knowledge.bundle.json` o equivalente;
-- índices por aplicación;
-- changelog;
-- reporte de cobertura;
-- lista de conflictos pendientes;
-- lista de reglas validadas y no validadas.
+Ejemplo:
 
-Esta release será consumible posteriormente por CarpiNova Designer/Cell.
+```json
+{
+  "coverage": {
+    "pdf_pages_total": 0,
+    "pdf_pages_processed": 0,
+    "complete": false
+  }
+}
+```
+
+### F1.4 — Cierre de extracción y Knowledge Release 1.0
+
+F1 se considera terminado solo cuando:
+
+1. el 100 % de páginas físicas está clasificado;
+2. el 100 % de páginas con contenido relevante está extraído;
+3. todas las figuras relevantes tienen FigureSpec o una razón documentada para no tenerlo;
+4. las medidas técnicas están al menos en estado `EXTRACTED`, con cobertura de verificación reportada;
+5. todos los conflictos conocidos están documentados;
+6. se ejecutó auditoría global final;
+7. se generó reporte de cobertura;
+8. se publicó `Knowledge 1.0` con los pendientes explícitos, sin ocultarlos.
 
 ## 20. Flujo de trabajo de una página
 
@@ -750,7 +777,8 @@ Debe evitar:
 
 - `source_transcription` conserva la fuente;
 - `normalized_text` no altera significado;
-- `learning_text` es más simple pero no inventa datos.
+- `learning_text` es más simple pero no inventa datos;
+- toda ampliación externa está marcada como tal.
 
 ### QA numérico
 
@@ -758,7 +786,7 @@ Cada número técnico requiere:
 
 1. fuente visible;
 2. asociación con el objeto correcto;
-3. unidad;
+3. unidad o motivo explícito para no tenerla;
 4. confianza;
 5. revisión visual antes de `VALIDATED`.
 
@@ -787,7 +815,9 @@ Como mínimo:
 - FigureSpec exige `purpose`, `type` y `source`;
 - referencias entre PageSpec/FigureSpec/RuleSpec son resolubles;
 - el generador de distribución produce un bundle reproducible;
-- un conflicto no puede promocionarse accidentalmente a `VALIDATED`.
+- un conflicto no puede promocionarse accidentalmente a `VALIDATED`;
+- una página sin numeración impresa puede existir con `printed_page=null`;
+- IDs no dependen de `printed_page`.
 
 ## 24. Seguridad y derechos
 
@@ -796,6 +826,7 @@ Como mínimo:
 - Assets de terceros se referencian antes de redistribuirse.
 - Los QR/manuales de terceros se registran como referencias; no se presume permiso para republicar sus materiales.
 - El contenido pedagógico derivado conserva vínculo con su fuente.
+- Un FigureSpec puede describir semánticamente una figura sin obligar a almacenar o redistribuir la imagen original.
 
 ## 25. Criterios de salida de F0
 
@@ -841,7 +872,8 @@ Mantener por lote y globalmente:
 - conflictos abiertos;
 - conceptos consolidados;
 - porcentaje de páginas con `learning_text`;
-- errores de schema.
+- errores de schema;
+- páginas/figuras bloqueadas por dudas o derechos.
 
 ## 28. Uso posterior
 
@@ -902,6 +934,10 @@ Usará la misma base como contexto y referencias, pero no sustituirá reglas det
 
 **Mitigación:** repositorio privado, no subir PDF automáticamente, separar fuentes de derivados y revisar derechos antes de publicación.
 
+### Páginas o figuras imposibles de interpretar con certeza
+
+**Mitigación:** marcarlas `NEEDS_REVIEW`; no inventar datos ni geometría.
+
 ## 30. Decisiones congeladas por este diseño
 
 Si esta especificación es aprobada:
@@ -910,12 +946,14 @@ Si esta especificación es aprobada:
 2. Se crea `CarpiNova-Knowledge` como repositorio privado independiente.
 3. No se duplica manualmente el conocimiento en PC y Cell.
 4. Se conservan tres capas textuales.
-5. Toda página mantiene PDF page + printed page.
-6. Las figuras usan FigureSpec detallado.
-7. Los números técnicos requieren revisión visual.
-8. Los lotes son adaptativos y basados en complejidad.
-9. El piloto técnico precede la extracción masiva.
-10. El libro se convierte en conocimiento estructurado, no en entrenamiento de IA.
+5. Toda página mantiene `pdf_page` y, cuando exista, `printed_page`.
+6. Los IDs canónicos de página/figura dependen de la página física del PDF.
+7. Las figuras usan FigureSpec detallado.
+8. Los números técnicos requieren revisión visual.
+9. Los lotes son adaptativos y basados en complejidad.
+10. El piloto técnico precede la extracción masiva.
+11. F1 busca cobertura completa del libro, no una muestra parcial.
+12. El libro se convierte en conocimiento estructurado, no en entrenamiento de IA.
 
 ## 31. Próximo paso después de aprobación
 
