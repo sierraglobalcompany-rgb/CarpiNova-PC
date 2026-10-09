@@ -2,45 +2,46 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Build and validate the first reusable CarpiNova Knowledge pipeline: audit the 2025 book, map physical/printed pages, freeze the JSON schemas, extract one technically representative pilot batch, validate it, and produce a consumable pilot bundle before any mass extraction begins.
+**Goal:** Build and validate the first reusable CarpiNova Knowledge pipeline: audit the 2025 book, map physical/printed pages, create a structural index, freeze the JSON schemas, extract one technically representative pilot batch, validate it, and produce a consumable pilot bundle before mass extraction begins.
 
-**Architecture:** `CarpiNova-Knowledge` is the canonical private repository. A small Python toolchain audits the source PDF and validates JSON/Markdown knowledge records; the source PDF itself is not committed. Human/agent semantic extraction produces traceable page records, FigureSpec objects, measurements and rule candidates. Only after the pilot passes coverage and reconstruction checks will F1 mass extraction receive its own implementation plan.
+**Architecture:** `CarpiNova-Knowledge` is the canonical private repository. JSON records are the machine-readable source of truth; Markdown files are generated human-review views. A small Python toolchain audits the PDF, maps pages, scaffolds batches, renders review documents, validates provenance/references and builds deterministic distributions. The source PDF remains external to Git. Human/agent semantic extraction produces traceable content, FigureSpec objects, measurements, rule candidates and pilot LessonSpecs.
 
-**Tech Stack:** Python 3.12; uv; PyMuPDF 1.26.x; JSON Schema Draft 2020-12 via jsonschema 4.x; pytest 8.x; Ruff 0.14.x; Markdown + JSON as canonical content formats.
+**Tech Stack:** Python 3.12; uv; PyMuPDF 1.26.x; JSON Schema Draft 2020-12 via jsonschema 4.x; pytest 8.x; Ruff 0.14.x; JSON as canonical structured content; generated Markdown for review.
 
 **Spec:** `docs/superpowers/specs/2026-10-09-carpinova-knowledge-f0-f1-design.md`
 
 ## Global Constraints
 
-- The canonical knowledge repository is `sierraglobalcompany-rgb/CarpiNova-Knowledge` and starts private.
-- Do not commit the source PDF or bulk copied third-party imagery to the knowledge repository.
-- `pdf_page` is 1-based and identifies the physical page in the PDF; `printed_page` is nullable and must never be inferred as equal to `pdf_page` by default.
-- Preserve three text layers: `source_transcription`, `normalized_text`, and `learning_text`; improvements must never overwrite source-derived content.
-- All source regions use normalized coordinates in the range `[0,1]`.
-- Technical numbers are not `VALIDATED` solely from OCR/text extraction; visual verification is required before validation.
-- Figures are first-class `FigureSpec` objects; technical diagrams must not be reduced to free-form image prompts.
-- External enrichment is excluded from source-derived text and must be explicitly marked and sourced if introduced later.
-- Rules affecting fabrication remain candidates in F0; no pilot rule becomes `EXECUTABLE`.
-- F0 pilot target is printed pages **88–95**, resolved to physical PDF pages through `page-map.json` before extraction.
-- F1 mass extraction does not start until the F0 pilot acceptance report is green.
+- Canonical repository: `sierraglobalcompany-rgb/CarpiNova-Knowledge`, initially private.
+- Never commit the source PDF or bulk copied third-party imagery.
+- `pdf_page` is 1-based physical position; `printed_page` is nullable and never assumed equal to `pdf_page`.
+- Preserve three distinct text layers per content block: `source_transcription`, `normalized_text`, `learning_text`.
+- `content.json` is canonical; `source.md`, `normalized.md` and `learning.md` are generated review views and must not be edited as independent sources of truth.
+- Source regions use normalized coordinates `[0,1]`.
+- No technical number becomes `VALIDATED` from text/OCR alone; visual-verification evidence is required.
+- Figures are first-class `FigureSpec` records; technical diagrams are never reduced to free-form image prompts.
+- External enrichment must be explicitly typed and sourced; it cannot silently enter source-derived text.
+- F0 rules remain `CANDIDATE`/`REVIEWED`; none becomes `EXECUTABLE`.
+- F0 pilot target: printed pages **88–95**, resolved through the verified page map.
+- F1 mass extraction starts only after F0 acceptance reports `GO`.
 
 ## Review Focus
 
-1. **Physical page vs printed page mismatch:** a missing/duplicate printed page must remain explicit and must not shift later source citations silently. Covered in Task 4.
-2. **Numeric OCR/extraction error:** a technical value may be extracted but cannot reach `VALIDATED` without visual verification evidence. Covered in Tasks 2 and 6.
-3. **Figure with incomplete geometry:** `FigureSpec` must permit `unknown`/`approximate` geometry instead of inventing precision, while retaining the source region. Covered in Tasks 2 and 7.
-4. **Improved prose drifting beyond the source:** `learning.md` must link back to source content IDs and external additions must fail validation unless marked `external_enrichment`. Covered in Tasks 2 and 7.
-5. **Broken cross-references after consolidation/export:** every figure, measurement, rule, concept and lesson reference in the pilot bundle must resolve deterministically. Covered in Tasks 6 and 8.
+1. **Physical/printed page mismatch:** missing or duplicate printed numbering must remain explicit instead of silently shifting citations. Test owner: Task 4.
+2. **Technical numeric extraction error:** a dimension may be stored as extracted but cannot become authoritative without visual verification. Test owner: Tasks 2 and 7.
+3. **Incomplete figure geometry:** FigureSpec must preserve `approximate`/`unknown` rather than fabricate exact geometry while keeping enough semantic detail to revisit/reconstruct. Test owner: Tasks 2 and 8.
+4. **Pedagogical rewrite drift:** every `learning_text` block must derive from explicit source block IDs or be marked `external_enrichment` with its own source. Test owner: Tasks 2 and 7.
+5. **Broken references in consumer exports:** figures, measurements, rules, concepts and lessons must resolve after bundling. Test owner: Tasks 7 and 9.
 
 ---
 
 ## Execution Prerequisite
 
-Before Task 1 begins, create the private repository `sierraglobalcompany-rgb/CarpiNova-Knowledge` with default branch `main`. Do not upload the source PDF to it. The approved spec and this implementation plan may then be copied into that repository under the same `docs/superpowers/...` paths so the knowledge repository is self-describing.
+Create the private repository `sierraglobalcompany-rgb/CarpiNova-Knowledge` with default branch `main` before Task 1. Copy the approved spec and this plan into that repository under the same paths. Do not upload the source PDF.
 
 ---
 
-### Task 1: Bootstrap the canonical knowledge repository and validation CLI
+### Task 1: Bootstrap CarpiNova-Knowledge and the CLI shell
 
 **Files:**
 - Create: `README.md`
@@ -55,42 +56,38 @@ Before Task 1 begins, create the private repository `sierraglobalcompany-rgb/Car
 
 **Interfaces:**
 - Consumes: none.
-- Produces: `python -m carpinova_knowledge <command>` CLI entrypoint used by later tasks.
+- Produces: `main(argv: Sequence[str] | None = None) -> int`; command shell for `audit-book`, `build-page-map`, `scaffold-batch`, `render-docs`, `validate`, `build-dist`, `report-pilot`.
 
-- [ ] **Step 1: Write the failing CLI smoke test**
+- [ ] **Step 1: Write failing CLI smoke test**
 
-`tests/test_cli.py` must assert that `python -m carpinova_knowledge --help` exits `0` and lists commands `audit-book`, `build-page-map`, `scaffold-batch`, `validate`, and `build-dist`.
+Assert `python -m carpinova_knowledge --help` exits `0` and lists all seven command names above.
 
-- [ ] **Step 2: Run the test and verify RED**
+- [ ] **Step 2: Run RED**
 
 Run: `uv run pytest tests/test_cli.py -v`
 
-Expected: FAIL because the package/CLI does not exist.
+Expected: FAIL because the package does not exist.
 
-- [ ] **Step 3: Add the minimal package and argparse CLI**
+- [ ] **Step 3: Implement minimal package/CLI and project metadata**
 
-Implement `main(argv: Sequence[str] | None = None) -> int` in `src/carpinova_knowledge/cli.py`; `__main__.py` calls it. Register command names only; later tasks attach implementations.
+Pin Python `>=3.12,<3.13`; runtime dependencies `PyMuPDF>=1.26,<2`, `jsonschema>=4.25,<5`; dev dependencies `pytest>=8,<9`, `ruff>=0.14,<1`. `.gitignore` excludes `source-books/`, `*.pdf`, `.venv/`, caches and `work/` preview/render output.
 
-`pyproject.toml` pins Python `>=3.12,<3.13` and declares runtime dependencies `PyMuPDF>=1.26,<2` and `jsonschema>=4.25,<5`; dev dependencies include `pytest>=8,<9` and `ruff>=0.14,<1`.
-
-`.gitignore` must exclude at minimum `source-books/`, `*.pdf`, `.venv/`, `__pycache__/`, `.pytest_cache/`, `.ruff_cache/`, and local rendered previews under `work/`.
-
-- [ ] **Step 4: Run checks and verify GREEN**
+- [ ] **Step 4: Run GREEN**
 
 Run: `uv run pytest tests/test_cli.py -v && uv run ruff check .`
 
-Expected: all PASS.
+Expected: PASS.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add README.md .gitignore pyproject.toml src tests docs
+git add .
 git commit -m "chore: bootstrap CarpiNova Knowledge"
 ```
 
 ---
 
-### Task 2: Freeze F0 JSON Schemas and canonical IDs
+### Task 2: Freeze F0 schemas, canonical IDs and text provenance
 
 **Files:**
 - Create: `schemas/common.schema.json`
@@ -110,43 +107,36 @@ git commit -m "chore: bootstrap CarpiNova Knowledge"
 - Create: `tests/test_ids.py`
 
 **Interfaces:**
-- Consumes: CLI/package from Task 1.
-- Produces: `load_schema(name: str) -> dict[str, Any]`, `validate_instance(schema_name: str, instance: Mapping[str, Any]) -> list[str]`, and deterministic ID helpers such as `page_id(book_id: str, pdf_page: int) -> str`, `figure_id(book_id: str, pdf_page: int, sequence: int) -> str`.
+- Consumes: package from Task 1.
+- Produces: `load_schema(name: str) -> dict[str, Any]`, `validate_instance(schema_name: str, instance: Mapping[str, Any]) -> list[str]`, canonical ID helpers.
 
-- [ ] **Step 1: Write schema meta-validation tests**
+- [ ] **Step 1: Write schema meta-validation and known-good fixture tests**
 
-`tests/test_schemas.py` must load every schema with `Draft202012Validator.check_schema(...)` and validate one known-good fixture for SourceSpec, PageSpec, ContentSpec, FigureSpec, MeasurementSpec, RuleSpec, ConceptSpec, LessonSpec and BatchSpec.
+Every schema must pass `Draft202012Validator.check_schema(...)` and one valid fixture must pass for SourceSpec, PageSpec, ContentSpec, FigureSpec, MeasurementSpec, RuleSpec, ConceptSpec, LessonSpec and BatchSpec.
 
-- [ ] **Step 2: Add failure-mode tests from the spec**
+- [ ] **Step 2: Write required negative tests**
 
-Tests must assert validation failure for:
+Reject: `pdf_page=0`; source coordinates outside `[0,1]`; `VALIDATED` measurement without visual verification; F0 `EXECUTABLE` rule; `learning_text` without `derived_from_content_ids` unless type is `external_enrichment` with external source; FigureSpec exact dimensions when geometry precision is `unknown`; malformed canonical IDs.
 
-- `pdf_page = 0`;
-- source-region coordinates outside `[0,1]`;
-- a measurement with `status="VALIDATED"` but without visual-verification evidence;
-- a rule with `status="EXECUTABLE"` during F0;
-- a `learning_text` record that has neither source-content links nor an explicit `external_enrichment` source;
-- a `FigureSpec` that invents exact dimensions while geometry confidence is `unknown`;
-- duplicate-style IDs that do not match the canonical ID regex.
-
-- [ ] **Step 3: Run tests and verify RED**
+- [ ] **Step 3: Run RED**
 
 Run: `uv run pytest tests/test_schemas.py tests/test_ids.py -v`
 
-Expected: FAIL because schemas/loaders do not exist.
+Expected: FAIL.
 
-- [ ] **Step 4: Implement schemas, loader and ID helpers**
+- [ ] **Step 4: Implement schemas and helpers**
 
-Use JSON Schema Draft 2020-12. Canonical IDs must be derived from physical PDF page, never printed page. Required patterns:
+Canonical IDs derive from physical PDF page:
 
-- page: `PAGE-{BOOK_ID}-P{pdf_page:04d}`;
-- figure: `FIG-{BOOK_ID}-P{pdf_page:04d}-{sequence:03d}`;
-- measurement: `MEAS-{BOOK_ID}-P{pdf_page:04d}-{sequence:03d}`;
-- rule candidate: `RULE-{BOOK_ID}-P{pdf_page:04d}-{sequence:03d}`.
+- `PAGE-{BOOK_ID}-P{pdf_page:04d}`
+- `CONTENT-{BOOK_ID}-P{pdf_page:04d}-{sequence:03d}`
+- `FIG-{BOOK_ID}-P{pdf_page:04d}-{sequence:03d}`
+- `MEAS-{BOOK_ID}-P{pdf_page:04d}-{sequence:03d}`
+- `RULE-{BOOK_ID}-P{pdf_page:04d}-{sequence:03d}`
 
-Figure geometry must support `precision: exact|approximate|unknown` and allow omitted dimensions for unknown geometry.
+ContentSpec stores the three text layers together with provenance; Markdown is not canonical. Figure geometry supports `precision: exact|approximate|unknown`, with dimensions optional for non-exact geometry.
 
-- [ ] **Step 5: Run complete schema tests and lint**
+- [ ] **Step 5: Run GREEN**
 
 Run: `uv run pytest tests/test_schemas.py tests/test_ids.py -v && uv run ruff check src tests`
 
@@ -155,181 +145,165 @@ Expected: PASS.
 - [ ] **Step 6: Commit**
 
 ```bash
-git add schemas src/carpinova_knowledge tests
+git add schemas src tests
 git commit -m "feat: define CarpiNova Knowledge schemas"
 ```
 
 ---
 
-### Task 3: Audit the book without committing the PDF
+### Task 3: Audit the source book without committing it
 
 **Files:**
 - Create: `src/carpinova_knowledge/audit_book.py`
 - Create: `tests/test_audit_book.py`
-- Create at runtime: `books/cpnc-2025/manifest.json`
-- Create at runtime: `books/cpnc-2025/audits/raw-page-audit.json`
+- Runtime output: `books/cpnc-2025/manifest.json`
+- Runtime output: `books/cpnc-2025/audits/raw-page-audit.json`
 
 **Interfaces:**
-- Consumes: Source/Page schema conventions from Task 2.
-- Produces: `audit_book(pdf_path: Path, book_id: str, output_dir: Path) -> BookAudit`; CLI `audit-book --pdf PATH --book-id cpnc-2025 --out books/cpnc-2025`.
+- Consumes: source/Page schema conventions.
+- Produces: `audit_book(pdf_path: Path, book_id: str, output_dir: Path) -> BookAudit`; CLI `audit-book`.
 
-- [ ] **Step 1: Write a synthetic-PDF audit test**
+- [ ] **Step 1: Write synthetic-PDF audit test**
 
-The test creates a 3-page PDF with PyMuPDF at runtime: page 1 has text only, page 2 has text plus one embedded image, page 3 has vector drawing content. Assert output uses 1-based `pdf_page`, reports page size, text length, image count, vector-drawing presence, SHA-256 of the source file, and total page count `3`.
+Generate a 3-page PDF at test time: text-only, text+embedded image, vector drawing. Assert 1-based pages, dimensions, text length, image/drawing counts, source SHA-256 and total page count.
 
-- [ ] **Step 2: Run the test and verify RED**
-
-Run: `uv run pytest tests/test_audit_book.py -v`
-
-Expected: FAIL because `audit_book` does not exist.
-
-- [ ] **Step 3: Implement the audit scanner**
-
-For every physical PDF page collect only objective baseline metadata: `pdf_page`, width/height, extracted text length, embedded image count, vector drawing count, and text blocks. `manifest.json` records book ID, source filename, SHA-256, audit timestamp and PDF page count. Do not run OCR and do not assign semantic topics in this task.
-
-- [ ] **Step 4: Run tests and verify GREEN**
+- [ ] **Step 2: Run RED**
 
 Run: `uv run pytest tests/test_audit_book.py -v`
 
-Expected: PASS.
+- [ ] **Step 3: Implement objective scanner**
 
-- [ ] **Step 5: Run against the 2025 source PDF locally**
+Collect per page: physical page, width/height, extracted text length, text blocks, embedded-image count, vector-drawing count. Manifest records book ID, source filename, SHA-256 and page count. Do not OCR or assign topics here.
 
-Run:
+- [ ] **Step 4: Run GREEN**
 
-```bash
-uv run python -m carpinova_knowledge audit-book \
-  --pdf /absolute/path/to/libros_1751553390342_Carpinteria_para_no_Carpinteros_Version_2025.pdf \
-  --book-id cpnc-2025 \
-  --out books/cpnc-2025
-```
+Run: `uv run pytest tests/test_audit_book.py -v`
 
-Expected: `manifest.json` and `audits/raw-page-audit.json` exist; the manifest page count matches the actual PDF; the PDF itself remains outside Git tracking.
+- [ ] **Step 5: Audit the real 2025 PDF locally**
 
-- [ ] **Step 6: Commit metadata only**
+Run `audit-book --pdf <local-book-path> --book-id cpnc-2025 --out books/cpnc-2025` and verify page count/SHA are stable while the PDF remains untracked.
 
-```bash
-git add books/cpnc-2025/manifest.json books/cpnc-2025/audits/raw-page-audit.json src tests
-git commit -m "feat: audit 2025 source book"
-```
+- [ ] **Step 6: Commit metadata/tooling**
+
+Commit message: `feat: audit 2025 source book`.
 
 ---
 
-### Task 4: Build and verify the physical-to-printed page map
+### Task 4: Map physical PDF pages to printed book pages
 
 **Files:**
 - Create: `src/carpinova_knowledge/page_map.py`
 - Create: `tests/test_page_map.py`
 - Create: `books/cpnc-2025/page-map-overrides.json`
-- Create at runtime: `books/cpnc-2025/page-map.json`
+- Runtime output: `books/cpnc-2025/page-map.json`
 
 **Interfaces:**
-- Consumes: `raw-page-audit.json` from Task 3.
+- Consumes: raw page audit.
 - Produces: `build_page_map(audit: BookAudit, overrides: Mapping[int, int | None]) -> PageMap`; CLI `build-page-map`.
 
-- [ ] **Step 1: Write page-map tests for normal and hostile inputs**
+- [ ] **Step 1: Write page-map tests**
 
-Tests must cover:
+Cover no printed number, normal sequence, duplicate candidate number, front matter, explicit override and guarantee that no physical page disappears.
 
-- physical pages with no printed number;
-- a normal consecutive printed sequence;
-- duplicate candidate printed numbers;
-- intentionally repeated/non-numbered front matter;
-- a wrong auto-candidate corrected by an explicit physical-page override;
-- no physical page ever disappears from the map.
-
-- [ ] **Step 2: Run tests and verify RED**
+- [ ] **Step 2: Run RED**
 
 Run: `uv run pytest tests/test_page_map.py -v`
 
-Expected: FAIL.
+- [ ] **Step 3: Implement candidate detection + override layer**
 
-- [ ] **Step 3: Implement candidate detection plus explicit overrides**
+Every entry has `mapping_status: candidate|verified|unresolved|not_printed`. Candidates may use text near margins but are never silently trusted; overrides are keyed by physical `pdf_page`.
 
-Candidate printed page detection may inspect text blocks near page margins, but candidate values are never silently trusted. Every entry has `mapping_status: candidate|verified|unresolved|not_printed`. `page-map-overrides.json` is keyed by physical `pdf_page`.
-
-- [ ] **Step 4: Run tests and verify GREEN**
+- [ ] **Step 4: Run GREEN**
 
 Run: `uv run pytest tests/test_page_map.py -v`
 
-Expected: PASS.
+- [ ] **Step 5: Resolve actual-book ambiguities visually**
 
-- [ ] **Step 5: Resolve the actual book map by visual inspection where needed**
+Require every physical page exactly once; printed page either verified integer or null; printed pages 88–95 must map unambiguously.
 
-Run the mapper, inspect unresolved/duplicate candidates in the source PDF, add only verified overrides, rerun, and require:
+- [ ] **Step 6: Commit**
 
-- every physical page is represented exactly once;
-- `printed_page` is either a verified integer or `null`;
-- the printed pages needed for pilot 88–95 resolve unambiguously to physical pages.
-
-- [ ] **Step 6: Commit the verified page map**
-
-```bash
-git add books/cpnc-2025/page-map.json books/cpnc-2025/page-map-overrides.json src tests
-git commit -m "feat: map physical and printed book pages"
-```
+Commit message: `feat: map physical and printed book pages`.
 
 ---
 
-### Task 5: Scaffold a batch without losing traceability
+### Task 5: Build the book structural index and seed taxonomy
+
+**Files:**
+- Create: `books/cpnc-2025/index.json`
+- Create: `taxonomy/materials.json`
+- Create: `taxonomy/hardware.json`
+- Create: `taxonomy/furniture.json`
+- Create: `taxonomy/construction-systems.json`
+- Create: `taxonomy/procedures.json`
+- Create: `taxonomy/glossary.json`
+- Create: `tests/test_book_index.py`
+
+**Interfaces:**
+- Consumes: verified page map and source PDF.
+- Produces: structural book index with chapter/section page ranges and initial canonical taxonomy IDs used by pilot extraction.
+
+- [ ] **Step 1: Write index-integrity tests**
+
+Assert every index range points to existing physical pages; no chapter range is inverted; known pilot printed page 91 resolves into exactly one section; taxonomy IDs are unique and aliases cannot point to missing canonical terms.
+
+- [ ] **Step 2: Run RED**
+
+Run: `uv run pytest tests/test_book_index.py -v`
+
+- [ ] **Step 3: Inspect the book index/separators and encode structure**
+
+Create chapter/section records with both physical page ranges and printed ranges when available. Do not infer topics page-by-page beyond what the book structure supports.
+
+- [ ] **Step 4: Seed only vocabulary required by the book structure + pilot**
+
+Create initial IDs for materials, hardware, furniture families, construction systems, procedures and glossary aliases. Do not attempt full ontology completion in F0.
+
+- [ ] **Step 5: Run GREEN and commit**
+
+Run: `uv run pytest tests/test_book_index.py -v`
+
+Commit message: `knowledge: map book structure and seed taxonomy`.
+
+---
+
+### Task 6: Scaffold the pilot and generate review Markdown from canonical JSON
 
 **Files:**
 - Create: `src/carpinova_knowledge/scaffold_batch.py`
+- Create: `src/carpinova_knowledge/render_docs.py`
 - Create: `tests/test_scaffold_batch.py`
+- Create: `tests/test_render_docs.py`
 - Create: `books/cpnc-2025/batches/batch-000-pilot.json`
-- Create at runtime: `books/cpnc-2025/pages/pXXXX/` for the pilot physical pages
+- Runtime page folders: `books/cpnc-2025/pages/pXXXX/`
 
 **Interfaces:**
-- Consumes: PageMap and JSON schemas.
-- Produces: `scaffold_batch(batch: BatchSpec, page_map: PageMap, root: Path) -> list[Path]`; CLI `scaffold-batch`.
+- Consumes: PageMap, BatchSpec and ContentSpec.
+- Produces: `scaffold_batch(...) -> list[Path]`; `render_page_docs(page_dir: Path) -> None`; CLI `scaffold-batch`, `render-docs`.
 
 - [ ] **Step 1: Write scaffold tests**
 
-Given a batch containing printed pages 88–95, assert the function resolves them to physical page IDs, creates exactly eight page folders and creates in each folder:
+Printed pages 88–95 must resolve to exactly eight physical page folders. Each folder contains `page.json`, `content.json`, `measurements.json`, `rules.json`, `figures/` plus generated `source.md`, `normalized.md`, `learning.md`. Rerun must not overwrite non-empty canonical JSON.
 
-- `page.json`
-- `source.md`
-- `normalized.md`
-- `learning.md`
-- `content.json`
-- `measurements.json`
-- `rules.json`
-- `figures/`
+- [ ] **Step 2: Write render-doc tests**
 
-Also assert rerunning is idempotent and never overwrites non-empty human/agent content.
+Given ContentSpec records, generated Markdown must reproduce each corresponding text layer in canonical content-ID order and contain a generated-file warning. Editing/deleting Markdown and rerunning must recreate it from JSON.
 
-- [ ] **Step 2: Run and verify RED**
+- [ ] **Step 3: Run RED**
 
-Run: `uv run pytest tests/test_scaffold_batch.py -v`
+Run: `uv run pytest tests/test_scaffold_batch.py tests/test_render_docs.py -v`
 
-Expected: FAIL.
+- [ ] **Step 4: Implement scaffolding/rendering**
 
-- [ ] **Step 3: Implement scaffolding**
+`batch-000-pilot.json`: printed pages 88–95; purpose `schema-and-reconstruction-pilot`. Missing/ambiguous mappings cause hard failure.
 
-`batch-000-pilot.json` is fixed to printed pages `88` through `95`, with `purpose="schema-and-reconstruction-pilot"`. Resolve to physical pages only through `page-map.json`; fail loudly if any printed page is ambiguous or missing.
+- [ ] **Step 5: Run GREEN, scaffold real pilot and commit**
 
-- [ ] **Step 4: Run and verify GREEN**
-
-Run: `uv run pytest tests/test_scaffold_batch.py -v`
-
-Expected: PASS.
-
-- [ ] **Step 5: Scaffold the actual pilot and commit**
-
-Run:
-
-```bash
-uv run python -m carpinova_knowledge scaffold-batch \
-  --batch books/cpnc-2025/batches/batch-000-pilot.json \
-  --page-map books/cpnc-2025/page-map.json \
-  --root books/cpnc-2025/pages
-```
-
-Commit the batch definition, scaffolding code/tests and empty structural files.
+Run tests, scaffold pilot, render docs and commit message `feat: scaffold knowledge pilot workflow`.
 
 ---
 
-### Task 6: Implement repository-wide semantic and referential validation
+### Task 7: Implement repository-wide integrity validation
 
 **Files:**
 - Create: `src/carpinova_knowledge/validate_repo.py`
@@ -338,283 +312,194 @@ Commit the batch definition, scaffolding code/tests and empty structural files.
 - Create: `tests/fixtures/repo-invalid/`
 
 **Interfaces:**
-- Consumes: all schemas and canonical IDs from Task 2.
-- Produces: `validate_repository(root: Path) -> ValidationReport`; CLI `validate --root .`.
+- Consumes: all schemas, IDs, page map, index and canonical JSON records.
+- Produces: `validate_repository(root: Path) -> ValidationReport`; CLI `validate`.
 
 - [ ] **Step 1: Write failing integrity tests**
 
-Tests must fail on:
+Fail on unresolved refs, duplicate IDs, learning content without source derivation, unsourced external enrichment, validated technical number without visual verification, out-of-page figure region, deterministic figure configured only for generative image output, page ID/pdf_page mismatch, and generated Markdown that is stale relative to canonical JSON.
 
-- unresolved cross-reference IDs;
-- duplicate IDs;
-- `learning.md` content with no mapped source content record;
-- `external_enrichment` without a non-book source;
-- a technical measurement set to `VALIDATED` without visual-verification metadata;
-- a FigureSpec source region outside the page;
-- a FigureSpec with `deterministic_required=true` but `generative_image_allowed=true` and no deterministic renderer;
-- a page folder whose `page.json.pdf_page` disagrees with its canonical page ID.
-
-The valid fixture must pass with zero errors.
-
-- [ ] **Step 2: Run and verify RED**
+- [ ] **Step 2: Run RED**
 
 Run: `uv run pytest tests/test_validate_repo.py -v`
 
-Expected: FAIL.
+- [ ] **Step 3: Implement validation order**
 
-- [ ] **Step 3: Implement deterministic validation**
+Schema → ID uniqueness → source/page consistency → page-map/index consistency → cross-reference resolution → measurement/rule states → figure reconstruction constraints → text provenance → rendered-doc freshness.
 
-Validation order: schema validity → ID uniqueness → source/page consistency → cross-reference resolution → technical-state constraints → figure reconstruction constraints → editorial provenance constraints. Return structured errors with code, file, object ID and JSON pointer/field where possible.
+Return structured errors with error code, file, object ID and field/JSON pointer when available.
 
-- [ ] **Step 4: Run and verify GREEN**
-
-Run: `uv run pytest tests/test_validate_repo.py -v`
-
-Expected: PASS.
-
-- [ ] **Step 5: Run all tests and commit**
+- [ ] **Step 4: Run GREEN + full suite**
 
 Run: `uv run pytest -q && uv run ruff check .`
 
-Expected: all PASS.
+- [ ] **Step 5: Commit**
 
 Commit message: `feat: validate knowledge repository integrity`.
 
 ---
 
-### Task 7: Extract the eight-page pilot with text, figures, measurements and rule candidates
+### Task 8: Extract and verify the eight-page pilot
 
 **Files:**
-- Modify: the eight physical page folders resolved from printed pages 88–95 under `books/cpnc-2025/pages/`
-- Create: one `fig-XXX.json` per visible meaningful figure under each page's `figures/`
-- Create/modify: `taxonomy/hardware.json`
-- Create/modify: `taxonomy/materials.json`
-- Create/modify: `taxonomy/furniture.json`
-- Create/modify: `taxonomy/construction-systems.json`
-- Create/modify: `taxonomy/glossary.json`
+- Modify: eight resolved pilot page folders under `books/cpnc-2025/pages/`
+- Create: one FigureSpec JSON per meaningful visible figure under page `figures/`
+- Create: `lessons/pilot/*.json`
+- Modify as required: `taxonomy/*.json`
 - Create: `docs/editorial-policy.md`
 - Create: `docs/visual-spec-policy.md`
 - Create: `docs/validation-policy.md`
 
 **Interfaces:**
-- Consumes: source PDF, verified page map, schemas and validator.
-- Produces: the first complete source-derived CarpiNova knowledge batch.
+- Consumes: source PDF, verified page map/index, schemas, taxonomy and validator.
+- Produces: first complete, source-derived CarpiNova knowledge batch plus at least one LessonSpec demonstrating Cell reuse.
 
-- [ ] **Step 1: Inspect each pilot page visually and inventory its content before rewriting**
+- [ ] **Step 1: Visually inventory each pilot page before rewriting**
 
-For every printed page 88–95, record in `page.json` the topics and content types actually present. Every meaningful diagram/photo/table/form receives a FigureSpec source region; do not skip graphics merely because text extraction cannot see them.
+Record actual topics/content types. Every meaningful diagram/photo/table/form gets a source region and FigureSpec; graphics are not skipped because text extraction cannot see them.
 
-- [ ] **Step 2: Populate `source.md` and structured source content**
+- [ ] **Step 2: Populate canonical ContentSpec records**
 
-Transcribe only what the page supports. Correct extraction artifacts only when visually verified. Create stable content IDs in `content.json` and link each content record to the exact source region when practical.
+For each source block store faithful `source_transcription`, editorial `normalized_text`, beginner-friendly `learning_text`, source region and provenance links. Do not add outside knowledge. If the source is unclear, preserve the uncertainty.
 
-- [ ] **Step 3: Populate `normalized.md`**
+- [ ] **Step 3: Extract technical MeasurementSpec records**
 
-Correct spelling, punctuation, units and paragraph structure without adding external knowledge. Keep terminology aligned with the source unless a glossary alias is recorded.
+Capture every technically relevant dimension, diameter, spacing, quantity, weight, angle or tolerance. Visually inspect before setting `VISUALLY_VERIFIED`; keep all pilot measurements below `VALIDATED` unless the validation policy explicitly requires a separate later technical-review gate.
 
-- [ ] **Step 4: Populate `learning.md`**
+- [ ] **Step 4: Extract RuleSpec candidates**
 
-Rewrite for a beginner using shorter explanations, explicit terminology and clearer sequencing. Every pedagogical block references the source content IDs it derives from. If the source does not explain a point, say so instead of filling the gap from general knowledge.
+Create `CANDIDATE` rules only from statements the source actually supports. Record applicability/exceptions only when present; never infer missing conditions.
 
-- [ ] **Step 5: Extract all technical measurements**
+- [ ] **Step 5: Build detailed FigureSpec records**
 
-Create `MeasurementSpec` records for every dimension, diameter, spacing, quantity, weight, angle or tolerance that matters technically. Inspect the page visually before assigning `VISUALLY_VERIFIED`; do not set any pilot measurement to `VALIDATED` in this task.
+For each meaningful visual record purpose, source box, entities, labels, relationships, measurements/annotations, geometry precision, preferred renderer, deterministic requirement, generative-image allowance, educational sequence where relevant and accessibility summary. Dimensioned/technical drawings must prefer deterministic SVG/3D/hybrid reconstruction.
 
-- [ ] **Step 6: Extract rule candidates**
+- [ ] **Step 6: Create at least one pilot LessonSpec**
 
-Move source statements that could later govern design/fabrication into `rules.json` with `status="CANDIDATE"`. Record applicability and exceptions only when supported by the page. Do not infer missing conditions.
+Choose a process/mechanism actually present in pages 88–95 (e.g. a hinge/slide topic if supported). The lesson references ContentSpec/FigureSpec IDs rather than duplicating source facts. It must demonstrate how Cell/tutorial modules can sequence explanation + figure + interaction without reopening the PDF.
 
-- [ ] **Step 7: Build detailed FigureSpec objects**
+- [ ] **Step 7: Render review Markdown and validate after each page**
 
-For every figure record:
+Run `render-docs` then `validate`. Zero errors are required before advancing to the next page.
 
-- semantic purpose;
-- source bounding box;
-- entities and labels;
-- relationships;
-- visible measurements/annotations;
-- geometry precision (`exact|approximate|unknown`);
-- preferred renderer (`svg|html|3d|image|hybrid`);
-- whether deterministic reconstruction is mandatory;
-- whether generative imagery is allowed;
-- an educational sequence when the source depicts a process or mechanism;
-- accessibility summary.
-
-For technical drawings and dimensioned diagrams, prefer deterministic SVG/3D/hybrid reconstruction and prohibit purely generative reconstruction.
-
-- [ ] **Step 8: Run validation after each physical page**
-
-Run: `uv run python -m carpinova_knowledge validate --root .`
-
-Expected: zero errors before proceeding to the next page. Warnings for unresolved semantic consolidation are allowed only if explicitly recorded.
-
-- [ ] **Step 9: Run complete regression suite**
+- [ ] **Step 8: Run complete regression suite**
 
 Run: `uv run pytest -q && uv run ruff check . && uv run python -m carpinova_knowledge validate --root .`
 
-Expected: all tests PASS and repository validation reports zero errors.
+Expected: PASS / zero validation errors.
 
-- [ ] **Step 10: Commit the pilot extraction**
+- [ ] **Step 9: Commit**
 
-```bash
-git add books/cpnc-2025 taxonomy docs
-git commit -m "knowledge: extract pilot pages 88-95"
-```
+Commit message: `knowledge: extract pilot pages 88-95`.
 
 ---
 
-### Task 8: Build a consumer bundle and prove cross-app reuse
+### Task 9: Build deterministic consumer bundles
 
 **Files:**
 - Create: `src/carpinova_knowledge/build_dist.py`
 - Create: `tests/test_build_dist.py`
-- Create at runtime: `dist/pilot/knowledge.bundle.json`
-- Create at runtime: `dist/pilot/figures.bundle.json`
-- Create at runtime: `dist/pilot/lessons.bundle.json`
+- Runtime outputs: `dist/pilot/knowledge.bundle.json`, `figures.bundle.json`, `lessons.bundle.json`, `manifest.json`
 
 **Interfaces:**
-- Consumes: validated pilot page data.
+- Consumes: validated pilot data.
 - Produces: `build_distribution(root: Path, batch_id: str, out_dir: Path) -> DistributionManifest`; CLI `build-dist`.
 
 - [ ] **Step 1: Write distribution tests**
 
-Assert bundles:
+Assert deterministic byte output; only requested batch + referenced taxonomy records; preserved source citations; no unresolved refs; no PDF bytes/local preview paths; candidate rules remain non-executable; normalized/learning text remain distinct; FigureSpec reconstruction metadata preserved; LessonSpec references resolve.
 
-- are deterministic byte-for-byte for unchanged source data;
-- contain only records belonging to the requested batch plus referenced consolidated taxonomy entries;
-- preserve source citations by book ID + physical/printed page + region;
-- contain no unresolved references;
-- exclude source PDF bytes and local preview paths;
-- do not promote `CANDIDATE` rules to executable rules;
-- expose `normalized` and `learning` content separately;
-- preserve FigureSpec renderer/reconstruction metadata.
-
-- [ ] **Step 2: Run and verify RED**
+- [ ] **Step 2: Run RED**
 
 Run: `uv run pytest tests/test_build_dist.py -v`
 
-Expected: FAIL.
+- [ ] **Step 3: Implement stable bundle generation**
 
-- [ ] **Step 3: Implement deterministic bundle generation**
+Sort arrays by canonical ID; stable JSON serialization; manifest includes schema version, knowledge version, book ID, batch ID and source manifest SHA-256.
 
-Sort all arrays by canonical ID and serialize JSON with stable key ordering/UTF-8 output. Build a manifest containing schema version, knowledge version, book ID, batch ID and source manifest SHA-256.
+- [ ] **Step 4: Run GREEN and build twice**
 
-- [ ] **Step 4: Run and verify GREEN**
+Build twice and compare SHA-256 hashes; unchanged source must produce identical outputs.
 
-Run: `uv run pytest tests/test_build_dist.py -v`
+- [ ] **Step 5: Commit**
 
-Expected: PASS.
-
-- [ ] **Step 5: Build the real pilot bundle and validate twice**
-
-Run the same `build-dist` command twice and compare SHA-256 hashes of outputs; they must match.
-
-- [ ] **Step 6: Commit**
-
-```bash
-git add src tests dist/pilot
-git commit -m "feat: build reusable knowledge pilot bundle"
-```
+Commit message: `feat: build reusable knowledge pilot bundle`.
 
 ---
 
-### Task 9: Produce the F0 acceptance audit and freeze the schema for F1 planning
+### Task 10: Acceptance audit and F0 freeze
 
 **Files:**
 - Create: `src/carpinova_knowledge/report_pilot.py`
 - Create: `tests/test_report_pilot.py`
 - Create: `audits/f0-pilot-acceptance.md`
-- Modify as needed: `schemas/*.schema.json`
-- Modify as needed: `docs/editorial-policy.md`
-- Modify as needed: `docs/visual-spec-policy.md`
-- Modify as needed: `docs/validation-policy.md`
+- Modify if pilot proves gaps: `schemas/*.schema.json`, policy docs
 - Create: `CHANGELOG.md`
 
 **Interfaces:**
-- Consumes: validation report and pilot bundles from Tasks 7–8.
-- Produces: `build_pilot_report(root: Path, batch_id: str) -> PilotAcceptanceReport`; F0 go/no-go decision for F1.
+- Consumes: validated pilot + distribution.
+- Produces: `build_pilot_report(root: Path, batch_id: str) -> PilotAcceptanceReport`; CLI `report-pilot`; final `GO|NO_GO`.
 
-- [ ] **Step 1: Write report tests**
+- [ ] **Step 1: Write acceptance tests**
 
-The report must fail acceptance if any of these are non-zero:
+Acceptance must be `NO_GO` when any required page file/record is missing, a meaningful visual lacks FigureSpec, technical measurements lack source location, cross-refs break, validation errors exist, pedagogical blocks lack provenance, pilot page mapping is ambiguous, or generated Markdown is stale.
 
-- pilot pages missing required files;
-- meaningful figures without FigureSpec;
-- technical measurements lacking source locations;
-- broken cross-references;
-- validation errors;
-- source-derived learning blocks without provenance;
-- ambiguous printed-to-physical mapping for pilot pages.
-
-It must also report counts of pages, figures by type, measurements by status, rule candidates, concepts, warnings and unresolved conflicts.
-
-- [ ] **Step 2: Run and verify RED**
+- [ ] **Step 2: Run RED**
 
 Run: `uv run pytest tests/test_report_pilot.py -v`
 
-Expected: FAIL.
+- [ ] **Step 3: Implement report**
 
-- [ ] **Step 3: Implement the acceptance report**
+Report counts: pages, figures by type, measurements by status, rule candidates, concepts, lessons, warnings/conflicts and validation errors. Result exactly `GO` or `NO_GO`.
 
-Acceptance result is exactly `GO` or `NO_GO`. `GO` means the format is adequate to start a separate F1 mass-extraction plan; it does not validate technical rules for fabrication.
+- [ ] **Step 4: Perform reconstruction audit**
 
-- [ ] **Step 4: Run the pilot report and perform spec-to-pilot reconstruction review**
+For every pilot FigureSpec answer in the report: can a future renderer identify important entities without reopening the page; distinguish exact/approximate/unknown geometry; bind labels/cotas to entities; know preferred reconstruction mode; and build a tutorial sequence where a process exists? Any `no` => `NO_GO` until fixed.
 
-For each FigureSpec, answer in `audits/f0-pilot-acceptance.md`:
-
-1. Can a future renderer identify every important entity without reopening the source page?
-2. Can it identify which geometry is exact vs approximate/unknown?
-3. Are every technical labels/cotas linked to the proper element?
-4. Is the preferred reconstruction mode explicit?
-5. Could Cell build a reasonable tutorial sequence from the stored data when a process exists?
-
-Any `no` produces `NO_GO` until the schema/content is corrected.
-
-- [ ] **Step 5: Self-review schema changes and rerun everything**
-
-Run:
+- [ ] **Step 5: Run complete checks**
 
 ```bash
 uv run pytest -q
 uv run ruff check .
 uv run python -m carpinova_knowledge validate --root .
 uv run python -m carpinova_knowledge build-dist --batch batch-000-pilot --out dist/pilot
+uv run python -m carpinova_knowledge report-pilot --batch batch-000-pilot
 ```
 
-Expected: all PASS and acceptance report `GO`.
+Expected: all PASS and report `GO`.
 
-- [ ] **Step 6: Freeze F0 as knowledge version `0.1.0`**
+- [ ] **Step 6: Freeze knowledge version `0.1.0`**
 
-Update `CHANGELOG.md` with schema/content changes and set the distribution manifest knowledge version to `0.1.0`. Do not start extracting the rest of the book in this task.
+Update distribution manifest and `CHANGELOG.md`. Do not begin remaining-book extraction in this task.
 
 - [ ] **Step 7: Commit F0 completion**
 
-```bash
-git add schemas docs audits src tests dist CHANGELOG.md
-git commit -m "chore: freeze CarpiNova Knowledge F0 pilot"
-```
+Commit message: `chore: freeze CarpiNova Knowledge F0 pilot`.
 
 ---
 
 ## F0 Definition of Done
 
-F0 is complete only when all of the following are true:
+F0 is complete only when:
 
-- the private canonical knowledge repository exists and contains the spec + plan;
-- the source PDF is not committed;
-- the 2025 book has a reproducible manifest and full physical-page audit;
-- physical and printed page identities are mapped explicitly;
-- the pilot printed pages 88–95 resolve unambiguously;
-- all F0 schemas pass JSON Schema validation;
-- repository validation catches provenance, numeric-state, FigureSpec and cross-reference failures;
-- all eight pilot pages contain faithful source transcription, normalized prose and beginner-friendly pedagogical prose;
-- every meaningful visual on the pilot pages has a FigureSpec;
-- technical numbers are visually checked before receiving `VISUALLY_VERIFIED` and none is promoted to fabrication authority merely from extraction;
+- private canonical repository exists with spec + plan;
+- source PDF is not committed;
+- full physical-page audit and reproducible source manifest exist;
+- physical/printed page map is explicit;
+- book chapter/section index exists;
+- pilot printed pages 88–95 map unambiguously;
+- all schemas validate;
+- canonical text provenance, numeric states, FigureSpec constraints and cross-references are automatically checked;
+- all eight pilot pages have source, normalized and beginner-friendly text layers in canonical ContentSpec records;
+- generated Markdown review views match canonical JSON;
+- every meaningful pilot visual has FigureSpec;
+- technical numbers are visually checked before `VISUALLY_VERIFIED` and are not silently promoted to fabrication authority;
 - rule candidates remain non-executable;
-- the pilot can be bundled deterministically for future Designer/Cell consumers;
+- at least one LessonSpec proves reuse for Cell/tutorials;
+- deterministic pilot bundles can be consumed later by Designer/Cell;
 - `audits/f0-pilot-acceptance.md` reports `GO`;
 - knowledge version `0.1.0` is frozen.
 
-## Explicitly Deferred to the F1 Plan
+## Explicitly Deferred to F1
 
-After F0 reports `GO`, write a separate F1 implementation plan for the remaining book. That plan will define adaptive batch boundaries (normally 5–6 pages; 3–4 for highly technical spreads; up to 8 for simple pages), chapter-level checkpoints, periodic consolidation every ~5 batches, conflict review, coverage tracking and the route to Knowledge `1.0`. Mass extraction must not be folded into this F0 execution plan.
+After F0 reports `GO`, create a separate F1 plan for the rest of the book. F1 will define adaptive batch boundaries (normally 5–6 pages; 3–4 for highly technical spreads; up to 8 for simple pages), chapter checkpoints, consolidation approximately every five batches, conflict review, coverage metrics and the path to Knowledge `1.0`. Do not fold mass extraction into F0.
