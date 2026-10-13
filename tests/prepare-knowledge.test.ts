@@ -17,14 +17,24 @@ const ARTIFACTS = [
   "lessons.bundle.json",
 ] as const;
 
-function manifest(files: Record<string, string> = Object.fromEntries(ARTIFACTS.map((name) => [name, "0".repeat(64)]))) {
+type ManifestOverrides = Partial<{
+  schema_version: string;
+  knowledge_version: string;
+  book_id: string;
+  scope: string;
+  source_manifest_sha256: string;
+  files: Record<string, string>;
+}>;
+
+function manifest(overrides: ManifestOverrides = {}) {
   return {
     schema_version: "0.1.0",
     knowledge_version: "1.0.0",
     book_id: "cpnc-2025",
     scope: "BOOK",
     source_manifest_sha256: SOURCE_SHA,
-    files,
+    files: Object.fromEntries(ARTIFACTS.map((name) => [name, "0".repeat(64)])),
+    ...overrides,
   };
 }
 
@@ -40,16 +50,19 @@ async function makeBundleDir() {
 }
 
 describe("Knowledge preparation contract", () => {
-  it("accepts only the exact Knowledge 1.0.0 book contract", () => {
-    expect(() => validateManifest(manifest())).not.toThrow();
+  it("accepts only supported Knowledge book contracts", () => {
+    expect(() => validateManifest(manifest({ knowledge_version: "1.0.0" }))).not.toThrow();
+    expect(() => validateManifest(manifest({ knowledge_version: "1.1.0" }))).not.toThrow();
+    expect(() => validateManifest(manifest({ knowledge_version: "1.2.0" }))).toThrow(
+      "knowledge_version",
+    );
 
     for (const [field, value] of [
-      ["knowledge_version", "1.0.1"],
       ["book_id", "other-book"],
       ["scope", "BATCH"],
       ["source_manifest_sha256", "f".repeat(64)],
     ] as const) {
-      expect(() => validateManifest({ ...manifest(), [field]: value })).toThrow(field);
+      expect(() => validateManifest(manifest({ [field]: value }))).toThrow(field);
     }
   });
 
@@ -57,16 +70,18 @@ describe("Knowledge preparation contract", () => {
     for (const missing of ARTIFACTS) {
       const files = { ...manifest().files };
       delete files[missing];
-      expect(() => validateManifest(manifest(files))).toThrow(missing);
+      expect(() => validateManifest(manifest({ files }))).toThrow(missing);
     }
   });
 
   it("verifies every declared artifact hash and names mismatches", async () => {
     const { dir, hashes } = await makeBundleDir();
-    await expect(verifyArtifactHashes(dir, manifest(hashes))).resolves.toBeUndefined();
+    await expect(verifyArtifactHashes(dir, manifest({ files: hashes }))).resolves.toBeUndefined();
 
     await writeFile(join(dir, "knowledge.bundle.json"), "changed\n", "utf8");
-    await expect(verifyArtifactHashes(dir, manifest(hashes))).rejects.toThrow("knowledge.bundle.json");
+    await expect(verifyArtifactHashes(dir, manifest({ files: hashes }))).rejects.toThrow(
+      "knowledge.bundle.json",
+    );
   });
 
   it("rejects a missing bundle artifact", async () => {
@@ -76,7 +91,9 @@ describe("Knowledge preparation contract", () => {
       await writeFile(join(missingDir, name), await readFile(join(dir, name)));
     }
 
-    await expect(verifyArtifactHashes(missingDir, manifest(hashes))).rejects.toThrow("figures.bundle.json");
+    await expect(
+      verifyArtifactHashes(missingDir, manifest({ files: hashes })),
+    ).rejects.toThrow("figures.bundle.json");
   });
 
   it("preserves an installed valid directory when preparation fails and cleans temporary output", async () => {

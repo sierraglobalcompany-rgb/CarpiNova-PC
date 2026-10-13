@@ -11,7 +11,7 @@ import type { KnowledgeRepository } from "../src/knowledge/types";
 const SOURCE_SHA =
   "318ceb94569608bfe062e3e50c7032edee79febf06102f7eec760769a6dfd90c";
 const ERROR_COPY =
-  "No se pudo cargar CarpiNova Knowledge 1.0.0. Ejecuta la preparación del conocimiento y vuelve a intentar.";
+  "No se pudo cargar CarpiNova Knowledge. Ejecuta la preparación del conocimiento y vuelve a intentar.";
 
 function validRepository(): KnowledgeRepository {
   return buildKnowledgeRepository(
@@ -86,6 +86,7 @@ describe("Bootstrap", () => {
     render(<Bootstrap load={load} />);
 
     expect(await screen.findByText(ERROR_COPY)).toBeInTheDocument();
+    expect(screen.queryByText(/Knowledge 1\.0\.0/i)).not.toBeInTheDocument();
     expect(
       screen.queryByRole("searchbox", { name: /buscar en carpinova/i }),
     ).not.toBeInTheDocument();
@@ -138,6 +139,7 @@ describe("Bootstrap", () => {
     render(<Bootstrap load={load} />);
 
     expect(await screen.findByText(ERROR_COPY)).toBeInTheDocument();
+    expect(screen.queryByText(/Knowledge 1\.0\.0/i)).not.toBeInTheDocument();
     expect(
       screen.queryByRole("searchbox", { name: /buscar en carpinova/i }),
     ).not.toBeInTheDocument();
