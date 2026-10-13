@@ -3,7 +3,7 @@ name: CarpiNova PC CI
 on:
   push:
     branches:
-      - design/knowledge-explorer-mvp1-20261012
+      - main
   pull_request:
     branches:
       - main
