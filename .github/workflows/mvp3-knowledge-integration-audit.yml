@@ -1,0 +1,98 @@
+name: MVP3 Knowledge Integration Audit
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout CarpiNova-PC
+        uses: actions/checkout@v7
+        with:
+          path: CarpiNova-PC
+
+      - name: Checkout canonical CarpiNova-Knowledge
+        uses: actions/checkout@v7
+        with:
+          repository: sierraglobalcompany-rgb/CarpiNova-Knowledge
+          ref: a47119aba3d4711c1ac69f33f7d236d9bc20bb78
+          path: CarpiNova-Knowledge
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: CarpiNova-PC/package-lock.json
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v10.3.0
+        with:
+          enable-cache: true
+
+      - name: Install PC dependencies
+        working-directory: CarpiNova-PC
+        run: npm ci
+
+      - name: Prepare canonical Knowledge 1.0
+        working-directory: CarpiNova-PC
+        run: npm run knowledge:prepare -- --knowledge-root ../CarpiNova-Knowledge
+
+      - name: Verify installed canonical guided lesson
+        working-directory: CarpiNova-PC
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFile } from 'node:fs/promises';
+
+          const expectedSource = '318ceb94569608bfe062e3e50c7032edee79febf06102f7eec760769a6dfd90c';
+          const expectedLessonId = 'LESSON-SLIDES-X-2X-PILOT';
+          const expectedTitle = 'Calcular e instalar correderas con X y 2X';
+
+          const manifest = JSON.parse(await readFile('generated/knowledge/manifest.json', 'utf8'));
+          const lessonsBundle = JSON.parse(await readFile('generated/knowledge/lessons.bundle.json', 'utf8'));
+
+          if (manifest.knowledge_version !== '1.0.0') throw new Error(`Unexpected knowledge_version: ${manifest.knowledge_version}`);
+          if (manifest.book_id !== 'cpnc-2025') throw new Error(`Unexpected book_id: ${manifest.book_id}`);
+          if (manifest.scope !== 'BOOK') throw new Error(`Unexpected scope: ${manifest.scope}`);
+          if (manifest.source_manifest_sha256 !== expectedSource) throw new Error('Unexpected source_manifest_sha256');
+
+          const lesson = lessonsBundle.lessons?.find((item) => item.lesson_id === expectedLessonId);
+          if (!lesson) throw new Error(`Missing ${expectedLessonId}`);
+          if (lesson.title !== expectedTitle) throw new Error(`Unexpected lesson title: ${lesson.title}`);
+
+          const orders = lesson.steps?.map((step) => step.order);
+          if (JSON.stringify(orders) !== JSON.stringify([1, 2, 3, 4, 5])) {
+            throw new Error(`Unexpected lesson steps: ${JSON.stringify(orders)}`);
+          }
+
+          console.log(JSON.stringify({
+            knowledge_version: manifest.knowledge_version,
+            book_id: manifest.book_id,
+            scope: manifest.scope,
+            source_manifest_sha256: manifest.source_manifest_sha256,
+            lesson_id: lesson.lesson_id,
+            title: lesson.title,
+            steps: orders,
+          }, null, 2));
+          NODE
+
+      - name: Run full tests
+        working-directory: CarpiNova-PC
+        run: npm test
+
+      - name: Typecheck
+        working-directory: CarpiNova-PC
+        run: npm run typecheck
+
+      - name: Build
+        working-directory: CarpiNova-PC
+        run: npm run build
