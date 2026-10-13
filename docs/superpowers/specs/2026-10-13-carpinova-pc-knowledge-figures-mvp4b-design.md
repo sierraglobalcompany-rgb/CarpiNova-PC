@@ -13,14 +13,7 @@
 
 MVP 3 demostró que CarpiNova-PC puede consumir una lección pedagógica canónica desde `lessons.bundle.json` sin duplicar ni inventar el contenido del libro.
 
-MVP4A demostró en `CarpiNova-Knowledge` que una figura técnica real puede:
-
-- declarar un contrato de render determinístico;
-- preservar trazabilidad a la página fuente;
-- describirse con geometría estructurada simple;
-- sobrevivir al builder BOOK;
-- renderizarse de forma byte-determinística;
-- superar una comparación visual contra la fuente canónica.
+MVP4A demostró en `CarpiNova-Knowledge` que una figura técnica real puede declarar un contrato de render determinístico, preservar trazabilidad a la página fuente, sobrevivir al builder BOOK y superar una comparación visual contra la fuente canónica.
 
 MVP4B debe cerrar el siguiente hueco con el menor cambio correcto posible:
 
@@ -32,7 +25,7 @@ Recorrido objetivo:
 abrir CarpiNova
 → cargar Knowledge 1.0.0 o 1.1.0 compatible
 → abrir “Calcular e instalar correderas con X y 2X”
-→ ver una única figura técnica de apoyo cuando el bundle 1.1.0 la declara renderizable
+→ ver una única figura técnica de apoyo cuando el bundle la declara renderizable
 → seguir leyendo los 5 pasos canónicos
 → abrir contenido/procedencia como hoy
 ```
@@ -51,21 +44,13 @@ figures.bundle.json
 lessons.bundle.json
 ```
 
-También verifica los SHA-256 declarados por `manifest.json` antes de instalar `generated/knowledge` de forma atómica.
+y verifica sus SHA-256 antes de instalar `generated/knowledge` de forma atómica.
 
-Por tanto, MVP4B NO necesita:
-
-- nuevo pipeline de distribución;
-- nuevo downloader;
-- nueva caché;
-- nueva copia del Knowledge;
-- almacenamiento separado de figuras.
-
-El artifact ya está dentro del flujo canónico de preparación.
+Por tanto, MVP4B NO necesita nuevo pipeline, downloader, caché, copia de Knowledge ni almacenamiento separado de figuras.
 
 ### 2.2 Runtime todavía no carga figuras
 
-`src/knowledge/loadKnowledge.ts` actualmente carga:
+`src/knowledge/loadKnowledge.ts` carga actualmente:
 
 ```text
 manifest.json
@@ -73,11 +58,7 @@ knowledge.bundle.json
 lessons.bundle.json
 ```
 
-pero no carga:
-
-```text
-figures.bundle.json
-```
+pero no `figures.bundle.json`.
 
 `KnowledgeRepository` tampoco contiene:
 
@@ -86,7 +67,7 @@ figures
 figuresById
 ```
 
-Existe entonces un hueco concreto:
+El hueco es concreto:
 
 ```text
 Knowledge construye figures.bundle.json
@@ -94,25 +75,17 @@ Knowledge construye figures.bundle.json
 → runtime todavía no lo consume
 ```
 
-MVP4B cierra exactamente ese hueco.
-
 ### 2.3 PC está fijado a Knowledge 1.0.0
 
-Hay dos locks explícitos actuales:
+Hay locks explícitos en:
 
 ```text
 scripts/prepare-knowledge.mjs
-EXPECTED_KNOWLEDGE_VERSION = "1.0.0"
-```
-
-```text
 src/knowledge/loadKnowledge.ts
-knowledge_version esperado = "1.0.0"
+src/knowledge/types.ts
 ```
 
-Además `KnowledgeManifest.knowledge_version` está tipado como literal `"1.0.0"`.
-
-Knowledge MVP4A genera un candidato BOOK:
+El candidato MVP4A usa:
 
 ```text
 knowledge_version = 1.1.0
@@ -121,7 +94,7 @@ book_id = cpnc-2025
 source_manifest_sha256 = 318ceb94569608bfe062e3e50c7032edee79febf06102f7eec760769a6dfd90c
 ```
 
-Sin MVP4B, PC rechaza correctamente ese candidato.
+Sin MVP4B, PC debe seguir rechazándolo.
 
 ### 2.4 La lección ya conserva `figure_ids`
 
@@ -131,15 +104,7 @@ Sin MVP4B, PC rechaza correctamente ese candidato.
 figure_ids?: string[];
 ```
 
-La lección `LESSON-SLIDES-X-2X-PILOT` referencia:
-
-```text
-FIG-CPNC-2025-P0113-001
-```
-
-varias veces entre sus pasos.
-
-`LessonPage` actualmente ignora esas referencias.
+La lección `LESSON-SLIDES-X-2X-PILOT` referencia `FIG-CPNC-2025-P0113-001` en varios pasos. `LessonPage` actualmente ignora esas referencias.
 
 No hace falta crear una ruta pedagógica nueva: el punto de integración ya existe.
 
@@ -156,10 +121,10 @@ con:
 ```text
 render_contract = normalized-2d-v1
 coordinate_space = normalized_figure
-viewport = 0 / 0 / 1 / 1
+viewport = {x:0,y:0,width:1,height:1}
 ```
 
-Primitivas del contrato MVP4A:
+Primitivas MVP4A:
 
 ```text
 rect
@@ -167,14 +132,7 @@ line
 polyline
 ```
 
-La figura contiene además:
-
-- `layers` ordenadas;
-- entities con geometría;
-- annotations con placement;
-- `accessibility.summary`;
-- referencias de medidas 009 / 010 / 011;
-- geometría marcada como `approximate` o `unknown` cuando corresponde.
+Además conserva layers, entities, annotations con placement, `accessibility.summary` y las medidas 009 / 010 / 011.
 
 ## 3. Principios obligatorios
 
@@ -190,18 +148,18 @@ La solución debe ser:
 - sin servicio adicional de figuras;
 - sin estado global nuevo fuera del `KnowledgeRepository` existente;
 - sin dependencia gráfica nueva;
-- sin engine genérico de render prematuro;
+- sin engine genérico de render;
 - sin duplicar el schema completo de Knowledge en PC.
 
 ### 3.2 Anti-ruido
 
-Orden obligatorio de decisión:
+Orden de decisión:
 
 ```text
 REUTILIZAR > SIMPLIFICAR > MEJORAR > CREAR
 ```
 
-MVP4B debe reutilizar:
+Se reutilizan:
 
 - `scripts/prepare-knowledge.mjs`;
 - `loadKnowledge()`;
@@ -212,28 +170,17 @@ MVP4B debe reutilizar:
 - SVG nativo;
 - tests y CI existentes.
 
-No se crea infraestructura paralela cuando el flujo actual puede extenderse.
-
 ### 3.3 Knowledge sigue siendo la única fuente de verdad
 
-PC no puede inventar:
-
-- geometría;
-- layers;
-- posiciones;
-- annotations;
-- medidas;
-- asociaciones de figuras con pasos;
-- contenido técnico;
-- interacción no distribuida.
+PC no inventa geometría, layers, posiciones, annotations, medidas, asociaciones de figuras con pasos ni interacción runtime.
 
 Si Knowledge no declara un dato, PC no lo reconstruye.
 
 ### 3.4 `UNRESOLVED > INVENTED`
 
-Una figura legacy válida pero no render-ready debe seguir siendo válida y simplemente no dibujarse.
+Una figura legacy válida pero no render-ready sigue siendo válida y simplemente no se dibuja.
 
-Una figura que declara `normalized-2d-v1` pero viola el contrato mínimo de consumo debe fallar cerrada durante carga, no renderizarse parcialmente.
+Una figura que declara `normalized-2d-v1` pero viola el contrato mínimo de consumo falla cerrada durante carga.
 
 ## 4. Decisión arquitectónica aprobada
 
@@ -247,27 +194,9 @@ A1 — figura única deduplicada por lección
 
 Se rechaza:
 
-### 4.1 Corte directo a 1.1.0
-
-Cambiar PC de `1.0.0` a `1.1.0` como reemplazo único sería más corto, pero rompería el release Knowledge `1.0.0` durante la transición coordinada.
-
-### 4.2 Adapters/loaders separados por versión
-
-Crear `KnowledgeV1Adapter`, `KnowledgeV11Adapter` o un router de versiones añade arquitectura sin necesidad demostrada. Los contratos son suficientemente aditivos para un único loader con allowlist explícita.
-
-### 4.3 Motor gráfico genérico
-
-No se crea:
-
-- renderer registry;
-- plugin system;
-- Canvas abstraction;
-- Three.js;
-- WebGL;
-- scene graph;
-- parser SVG arbitrario.
-
-Una sola figura real no justifica esas capas.
+- corte directo a 1.1.0, porque rompería la transición con Knowledge 1.0.0;
+- adapters/loaders separados por versión, porque añaden arquitectura innecesaria;
+- renderer registry, plugin system, Canvas abstraction, Three.js, WebGL o scene graph, porque una sola capability real no los justifica.
 
 ## 5. Compatibilidad de versiones
 
@@ -279,21 +208,13 @@ PC soportará exactamente:
 type SupportedKnowledgeVersion = "1.0.0" | "1.1.0";
 ```
 
-La validación debe seguir siendo fail-closed.
+No se permiten rangos semver como `>=1.0.0`, `^1.0.0` o `1.x`.
 
-No se permiten rangos tipo:
-
-```text
->=1.0.0
-^1.0.0
-1.x
-```
-
-Una versión futura como `1.2.0` debe rechazarse hasta que PC la certifique explícitamente.
+Una futura `1.2.0` debe rechazarse hasta certificación explícita.
 
 ### 5.2 Invariantes que NO cambian
 
-Tanto 1.0.0 como 1.1.0 deben exigir:
+Ambas versiones deben exigir:
 
 ```text
 book_id = cpnc-2025
@@ -302,13 +223,11 @@ source_manifest_sha256 = 318ceb94569608bfe062e3e50c7032edee79febf06102f7eec76076
 artifact SHA-256 integrity = required
 ```
 
-La compatibilidad de versión no debilita source identity ni artifact integrity.
+Aceptar 1.1.0 no debilita source identity ni artifact integrity.
 
 ### 5.3 Preparación local
 
-`scripts/prepare-knowledge.mjs` debe aceptar ambas versiones soportadas.
-
-El flujo sigue siendo:
+`scripts/prepare-knowledge.mjs` debe aceptar ambas versiones soportadas y conservar el flujo actual:
 
 ```text
 validate Knowledge repo
@@ -318,11 +237,11 @@ validate Knowledge repo
 → atomic install generated/knowledge
 ```
 
-No se introduce modo especial para 1.1.0.
+No existe modo especial para 1.1.0.
 
 ## 6. Contrato mínimo de figuras en PC
 
-PC debe tipar solo lo que consume.
+PC debe tipar solo los campos que consume.
 
 Contrato conceptual:
 
@@ -342,7 +261,7 @@ interface FigureRecord {
   purpose: string;
   entities: FigureEntity[];
   annotations: FigureAnnotation[];
-  layers: FigureLayer[];
+  layers?: FigureLayer[];
   camera?: FigureCamera;
   reconstruction: FigureReconstruction;
   accessibility?: {
@@ -353,19 +272,17 @@ interface FigureRecord {
 interface FigureReconstruction {
   render_contract?: string;
 }
-```
 
-Para `normalized-2d-v1`, PC además necesita geometría mínima:
-
-```ts
 type FigurePrimitive = "rect" | "line" | "polyline";
 ```
 
-No se replica el `figure.schema.json` completo.
+`layers` y `camera` permanecen opcionales en el tipo general porque una figura legacy puede ser válida sin contrato render-ready. Al optar por `normalized-2d-v1`, esos campos pasan a ser obligatorios por validación.
+
+No se replica `figure.schema.json` completo.
 
 ## 7. Extensión del `KnowledgeRepository`
 
-El repositorio existente se amplía conceptualmente a:
+El repositorio existente se amplía a:
 
 ```ts
 interface KnowledgeRepository {
@@ -384,7 +301,7 @@ No se crea `FigureRepository`, context separado ni service adicional.
 
 ## 8. Carga de `figures.bundle.json`
 
-`loadKnowledge()` pasa a cargar cuatro documentos runtime:
+`loadKnowledge()` pasa a cargar:
 
 ```text
 manifest.json
@@ -404,25 +321,15 @@ manifest
 → KnowledgeRepository
 ```
 
-`figures.bundle.json` debe validarse antes de exponerlo a UI.
+`figures.bundle.json` debe validarse antes de exponerse a UI.
 
 ## 9. Validación mínima consumer-side
 
-Knowledge continúa siendo autoridad de validación profunda.
+Knowledge continúa siendo autoridad de validación profunda. PC valida solo lo necesario para consumir de forma segura.
 
-PC valida únicamente lo que necesita para consumir de forma segura.
+### 9.1 Identidad
 
-### 9.1 Identidad de bundle
-
-Si `figures.bundle.json` declara cualquiera de estos campos:
-
-```text
-knowledge_version
-book_id
-scope
-```
-
-deben coincidir con `manifest.json`.
+Si `figures.bundle.json` declara `knowledge_version`, `book_id` o `scope`, deben coincidir con `manifest.json`.
 
 ### 9.2 Colección
 
@@ -439,11 +346,9 @@ page_id = existing page
 
 Todo `figure_id` distribuido dentro de una lección debe resolver en `figuresById`.
 
-PC no tolera referencias rotas.
-
 ### 9.4 Legacy figures
 
-Una figura que no declara:
+Una figura sin:
 
 ```text
 reconstruction.render_contract = normalized-2d-v1
@@ -458,22 +363,22 @@ load = valid
 render = skipped
 ```
 
-PC no debe inferir renderabilidad a partir de `type`, `entities` o nombres.
+PC no infiere renderabilidad por `type`, nombre o presencia parcial de geometría.
 
 ### 9.5 `normalized-2d-v1`
 
-Si una figura opta explícitamente por ese contrato, PC debe exigir al menos:
+Si una figura opta por ese contrato, PC exige:
 
 ```text
 camera.coordinate_space = normalized_figure
-viewport = valid 0..1 full viewport
+camera.viewport = exactly {x:0,y:0,width:1,height:1}
 layers = non-empty
 supported primitives only
-layer references resolve locally
-rendered annotations have placement
+layer entity/annotation refs resolve locally
+visible annotations have placement
 ```
 
-La validación PC no necesita duplicar todas las reglas editoriales de Knowledge, pero sí debe impedir que el renderer reciba un contrato roto.
+El renderer nunca recibe un contrato render-ready roto.
 
 ## 10. Renderer UI
 
@@ -505,8 +410,6 @@ normalized 0..1
 → SVG 0..1000
 ```
 
-Esto replica conceptualmente el renderer QA de Knowledge sin copiar infraestructura Python.
-
 ### 10.3 Primitivas
 
 MVP4B soporta únicamente:
@@ -518,27 +421,17 @@ polyline
 text annotation
 ```
 
-No existe fallback para primitive desconocida.
-
-Una primitive desconocida en una figura `normalized-2d-v1` es error de contrato.
+Una primitive desconocida dentro de `normalized-2d-v1` es error de contrato; no hay fallback gráfico.
 
 ### 10.4 Painter order
 
-Layers se dibujan por:
+Layers se dibujan por `order` ascendente y, en empate, por `id` para mantener orden estable. Dentro de cada layer se conserva el orden de sus arrays.
 
-```text
-order ascendente
-```
-
-En empate, usar criterio estable por `id` para evitar nondeterminismo.
-
-Dentro de cada layer se conserva el orden de sus arrays.
-
-### 10.5 Texto
+### 10.5 Texto seguro
 
 Annotations se renderizan como nodos React `<text>`.
 
-No usar:
+Prohibido:
 
 ```text
 dangerouslySetInnerHTML
@@ -546,25 +439,17 @@ raw SVG string injection
 HTML dentro del SVG
 ```
 
-React se encarga del escaping de texto.
-
 ### 10.6 Estilo
 
-MVP4B utiliza estilo técnico simple y consistente con la app.
+La figura es técnica y esquemática, no fotorealista. La UI no debe convertir geometría `approximate` o `unknown` en apariencia de precisión CAD ni agregar cotas o detalles ausentes en Knowledge.
 
-La geometría es semántica, no fotorealista.
-
-No debe presentar geometría `approximate` o `unknown` como precisión CAD.
-
-No se agregan cotas, flechas ni detalles que Knowledge no distribuye.
+El SVG debe adaptarse al ancho disponible sin cambiar su `viewBox`; el layout de la página controla el tamaño visual, no los datos geométricos.
 
 ## 11. Integración en `LessonPage`
 
 ### 11.1 Estrategia A1
 
-Los `figure_ids` de todos los pasos se recorren en orden canónico.
-
-Se construye una lista:
+Los `figure_ids` de todos los pasos se recorren en orden canónico y se crea una lista:
 
 ```text
 first-seen order
@@ -572,11 +457,9 @@ first-seen order
 + solo figures renderables
 ```
 
-Para la lección piloto, `FIG-CPNC-2025-P0113-001` aparece una sola vez aunque varios steps la referencien.
+`FIG-CPNC-2025-P0113-001` debe mostrarse una sola vez aunque varios steps la referencien.
 
 ### 11.2 Ubicación
-
-Las figuras renderables se muestran:
 
 ```text
 lesson title
@@ -584,30 +467,15 @@ lesson title
 → ordered steps
 ```
 
-No se insertan repetidamente dentro de cada paso en MVP4B.
+No se repite la figura dentro de cada paso en MVP4B.
 
-### 11.3 Razón
+### 11.3 Sin nueva ruta
 
-Esta ubicación:
-
-- evita ruido visual;
-- no finge que `interaction` ya se ejecuta;
-- mantiene la figura disponible como referencia mientras se lee la lección;
-- conserva la secuencia pedagógica textual existente.
-
-### 11.4 Sin nueva ruta
-
-MVP4B NO añade:
-
-```text
-/figuras/:figureId
-```
-
-No existe necesidad actual de navegación standalone de figuras.
+MVP4B NO añade `/figuras/:figureId`.
 
 ## 12. Interactions siguen siendo metadatos opacos
 
-La lección contiene metadata como:
+Metadata como:
 
 ```text
 highlight
@@ -616,36 +484,28 @@ identify_parts
 guided_sequence
 ```
 
-MVP4B NO la ejecuta.
+NO se ejecuta en MVP4B.
 
-El renderer no debe:
-
-- resaltar entities según step;
-- ocultar layers;
-- animar secuencias;
-- cambiar estado por step;
-- interpretar payloads de interaction.
-
-La existencia de esos metadatos no autoriza comportamiento runtime.
-
-Eso requiere otro MVP explícito.
+El renderer no resalta entities por step, no oculta layers, no anima secuencias y no interpreta payloads de `interaction`.
 
 ## 13. Accessibility
 
-Cada figura renderizada debe exponer significado suficiente sin depender del dibujo.
-
-Contrato mínimo:
+Cada figura renderizada debe exponer:
 
 ```text
 role = img
-aria-label = accessibility.summary
 ```
 
-Si una figura `normalized-2d-v1` no contiene un summary usable, el plan de implementación debe decidir un fallback seguro basado únicamente en campos canónicos (`purpose`), nunca en texto inventado.
+Nombre accesible determinístico:
 
-Annotations visibles permanecen como texto SVG.
+```text
+1. accessibility.summary si es string no vacío
+2. figure.purpose si summary no existe o está vacío
+```
 
-No depender solo de color para distinguir estructura.
+Ambos valores provienen de Knowledge; no se inventa texto.
+
+Annotations visibles permanecen como `<text>` SVG y la comprensión no debe depender únicamente del color.
 
 ## 14. Error handling
 
@@ -655,72 +515,69 @@ Debe fallar carga ante:
 
 - Knowledge version no soportada;
 - manifest inválido;
-- artifact hash roto en prepare;
+- artifact hash roto durante prepare;
 - `figures` no array;
 - duplicate `figure_id`;
 - `page_id` inexistente;
 - lesson `figure_id` inexistente;
 - malformed `normalized-2d-v1`;
-- primitive no soportada dentro de contrato renderizable;
+- primitive no soportada dentro del contrato;
 - broken local layer references.
 
 ### 14.2 Legacy válido
 
 No debe fallar por el solo hecho de encontrar una figura legacy no render-ready.
 
-```text
-legacy figure
-→ valid data
-→ no FigureDiagram
-```
+### 14.3 Sin placeholder ruidoso
 
-### 14.3 No placeholder engañoso
-
-No mostrar mensajes tipo:
-
-```text
-“Figura no disponible”
-```
-
-para cada figura legacy de todo el libro.
-
-Eso convertiría ausencia de capability en ruido UI.
-
-MVP4B simplemente omite figuras no renderables.
+No mostrar automáticamente “Figura no disponible” para figuras legacy. Se omiten silenciosamente porque no son renderizables bajo el contrato actual.
 
 ## 15. Compatibilidad 1.0.0
 
-MVP4B debe demostrar explícitamente que Knowledge `1.0.0` sigue funcionando.
+MVP4B debe demostrar que Knowledge `1.0.0` sigue funcionando.
 
 En 1.0.0:
 
 - `figures.bundle.json` ya existe;
-- muchas figuras son legacy;
+- las figuras pueden ser legacy;
 - `normalized-2d-v1` puede no existir;
-- la lección debe seguir cargando;
-- texto, búsqueda y ContentPage no deben degradarse;
+- la lección sigue cargando;
+- texto, búsqueda y ContentPage no degradan;
 - si no hay figura render-ready, LessonPage permanece esencialmente como MVP3.
 
-La compatibilidad no significa intentar reconstruir legacy figures.
+Compatibilidad NO significa reconstruir figuras legacy.
 
 ## 16. Compatibilidad 1.1.0
 
 Con el candidato 1.1.0:
 
-- prepare debe aceptar versión;
-- runtime debe aceptar versión;
-- `figures.bundle.json` debe cargarse;
-- P0113 debe resolver por ID;
-- debe reconocerse `normalized-2d-v1`;
-- la figura debe mostrarse una sola vez en la lección;
-- el resto de flows MVP1/MVP2/MVP3 debe mantenerse.
+- prepare acepta la versión;
+- runtime acepta la versión;
+- `figures.bundle.json` se carga;
+- P0113 resuelve por ID;
+- `normalized-2d-v1` se reconoce y valida;
+- la figura se muestra una vez;
+- flows MVP1/MVP2/MVP3 se mantienen.
 
-## 17. Archivos que probablemente participarán
+## 17. Mensajes de Bootstrap
+
+`src/app/Bootstrap.tsx` actualmente menciona explícitamente “CarpiNova Knowledge 1.0.0” en el mensaje de error.
+
+Con compatibilidad dual, ese texto debe volverse neutral respecto de la versión, por ejemplo conceptualmente:
+
+```text
+No se pudo cargar CarpiNova Knowledge. Ejecuta la preparación del conocimiento y vuelve a intentar.
+```
+
+La UI no debe afirmar una versión concreta que puede no ser la instalada.
+
+## 18. Archivos que probablemente participarán
 
 La implementación debería poder limitarse aproximadamente a:
 
 ```text
 scripts/prepare-knowledge.mjs
+src/app/Bootstrap.tsx
 src/knowledge/types.ts
 src/knowledge/loadKnowledge.ts
 src/features/figures/FigureDiagram.tsx
@@ -729,17 +586,13 @@ src/styles/* existente cuando aplique
 tests/* focales
 ```
 
-Esto es una expectativa de alcance, no autorización para tocar todos esos archivos.
+Esto es expectativa de alcance, no autorización para modificar todos esos archivos. El plan deberá demostrar necesidad antes de cada cambio.
 
-El plan debe demostrar necesidad antes de cada cambio.
-
-## 18. Tests obligatorios
+## 19. Tests obligatorios
 
 La implementación seguirá TDD.
 
-### 18.1 Prepare compatibility
-
-Probar:
+### 19.1 Prepare compatibility
 
 ```text
 1.0.0 accepted
@@ -749,9 +602,7 @@ wrong source SHA rejected
 broken artifact hash rejected
 ```
 
-### 18.2 Loader compatibility
-
-Probar:
+### 19.2 Loader compatibility
 
 ```text
 1.0.0 accepted
@@ -762,9 +613,7 @@ figuresById built
 bundle identity mismatch rejected
 ```
 
-### 18.3 Integrity
-
-Probar:
+### 19.3 Integrity
 
 ```text
 duplicate figure_id rejected
@@ -774,9 +623,7 @@ malformed normalized-2d-v1 rejected
 legacy figure accepted without render contract
 ```
 
-### 18.4 Renderer
-
-Probar:
+### 19.4 Renderer
 
 ```text
 rect
@@ -787,23 +634,29 @@ layer ordering
 stable output semantics
 unknown primitive fail-closed
 accessible role/name
+summary -> purpose fallback
 ```
 
-No se exige byte-identidad DOM con Python; sí equivalencia contractual y determinismo de estructura.
+No se exige byte-identidad del DOM React con el renderer Python; sí equivalencia contractual y determinismo estructural.
 
-### 18.5 Lesson integration
-
-Probar:
+### 19.5 Lesson integration
 
 ```text
 P0113 rendered once when referenced multiple times
 first-seen figure order preserved
-legacy-only lesson does not create empty noisy figure section
-steps and content links remain unchanged
-safe return navigation remains unchanged
+legacy-only lesson creates no empty/noisy figure section
+steps and content links unchanged
+safe return navigation unchanged
 ```
 
-### 18.6 Regression
+### 19.6 Bootstrap
+
+```text
+error message remains actionable
+error message is version-neutral
+```
+
+### 19.7 Regression
 
 Debe pasar:
 
@@ -816,27 +669,36 @@ npm audit
 
 además del CI existente.
 
-## 19. Gate de integración real con Knowledge
+## 20. Gate de integración real con Knowledge
 
-Antes de cerrar MVP4B debe existir evidencia usando el candidato real de Knowledge 1.1.0, no solo fixtures construidos a mano.
+Antes de cerrar MVP4B debe existir evidencia contra bundles reales, no solo fixtures manuales.
 
-Gate mínimo:
+### 20.1 Knowledge 1.0.0
 
 ```text
-CarpiNova-PC branch
+CarpiNova-PC MVP4B branch
++
+CarpiNova-Knowledge 1.0.0
+→ knowledge:prepare PASS
+→ runtime load PASS
+→ existing lesson/content flows PASS
+```
+
+### 20.2 Knowledge 1.1.0 candidate
+
+```text
+CarpiNova-PC MVP4B branch
 +
 CarpiNova-Knowledge candidate 1.1.0
 → knowledge:prepare PASS
-→ runtime bundles PASS
+→ figures load PASS
 → lesson P0113 render PASS
 → tests/typecheck/build PASS
 ```
 
-También debe ejecutarse una comprobación separada con Knowledge 1.0.0.
+## 21. Release coordination
 
-## 20. Release coordination
-
-MVP4B cierra compatibilidad del consumidor, pero no debe publicar Knowledge automáticamente.
+MVP4B cierra compatibilidad del consumidor, pero no publica Knowledge automáticamente.
 
 Secuencia segura:
 
@@ -844,7 +706,7 @@ Secuencia segura:
 MVP4A Knowledge candidate PASS
 → MVP4B PC compatibility PASS
 → coordinated release decision
-→ merge/release Knowledge 1.1.0 only after evidence
+→ merge/release Knowledge 1.1.0 solo con evidencia
 ```
 
 Hasta entonces:
@@ -856,7 +718,7 @@ Knowledge public release = 1.0.0
 
 La spec no autoriza cambiar ese estado.
 
-## 21. Scope explícitamente fuera
+## 22. Scope explícitamente fuera
 
 MVP4B NO incluye:
 
@@ -889,28 +751,29 @@ CarpiNova-cell
 
 Agregar cualquiera requiere una decisión posterior explícita.
 
-## 22. Criterios de aceptación
+## 23. Criterios de aceptación
 
-MVP4B puede considerarse funcionalmente completo solo si se demuestra todo lo siguiente:
+MVP4B puede considerarse funcionalmente completo solo si se demuestra:
 
-1. PC conserva compatibilidad con Knowledge 1.0.0.
-2. PC acepta explícitamente Knowledge 1.1.0 candidate.
-3. Versiones no certificadas siguen rechazándose.
-4. Source SHA/book/scope/artifact integrity permanecen estrictos.
-5. `figures.bundle.json` se carga en runtime.
-6. `figures` y `figuresById` se exponen desde el repositorio existente.
-7. Las referencias lesson → figure se validan.
-8. Legacy figures siguen válidas y no se inventan.
-9. `normalized-2d-v1` se valida antes de render.
-10. React SVG soporta únicamente rect/line/polyline/text del contrato actual.
-11. P0113 se muestra una sola vez en la lección piloto.
-12. `accessibility.summary` se usa para nombre accesible cuando existe.
-13. No se ejecuta ningún metadata `interaction`.
-14. MVP1/MVP2/MVP3 no regresan.
-15. Tests, typecheck, build, audit y CI pasan.
-16. Integración real 1.0.0 y 1.1.0 queda evidenciada.
+1. compatibilidad con Knowledge 1.0.0;
+2. compatibilidad explícita con Knowledge 1.1.0 candidate;
+3. rechazo de versiones no certificadas;
+4. source SHA/book/scope/artifact integrity estrictos;
+5. `figures.bundle.json` cargado en runtime;
+6. `figures` y `figuresById` expuestos desde el repositorio existente;
+7. referencias lesson → figure validadas;
+8. legacy figures válidas sin geometría inventada;
+9. `normalized-2d-v1` validado antes de render;
+10. React SVG limitado a rect/line/polyline/text del contrato;
+11. P0113 visible una sola vez en la lección piloto;
+12. nombre accesible derivado solo de `accessibility.summary` o `purpose`;
+13. ningún metadata `interaction` ejecutado;
+14. mensaje de Bootstrap neutral respecto de versión;
+15. MVP1/MVP2/MVP3 sin regresión;
+16. tests, typecheck, build, audit y CI verdes;
+17. integración real 1.0.0 y 1.1.0 evidenciada.
 
-## 23. Definición de éxito de producto
+## 24. Definición de éxito de producto
 
 El éxito de MVP4B no es “tener un sistema de diagramas”.
 
@@ -926,9 +789,9 @@ PDF canónico
 → SVG técnico accesible
 ```
 
-sin duplicar conocimiento y sin añadir una arquitectura que todavía no necesitamos.
+sin duplicar conocimiento y sin añadir arquitectura prematura.
 
-## 24. Estado después de esta spec
+## 25. Estado después de esta spec
 
 Cuando el usuario apruebe esta spec escrita:
 
@@ -938,7 +801,7 @@ NEXT = escribir plan de implementación MVP4B
 
 La aprobación de esta spec NO autoriza todavía implementación de producto.
 
-El plan posterior deberá dividir el trabajo en bloques TDD pequeños y conservar la regla operativa del proyecto:
+El plan posterior deberá dividir el trabajo en bloques TDD pequeños y conservar la regla operativa:
 
 ```text
 one short task
