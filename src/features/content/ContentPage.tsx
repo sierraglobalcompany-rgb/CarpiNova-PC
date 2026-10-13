@@ -1,12 +1,19 @@
-import { Link, useParams } from "react-router-dom";
+import { Link, useLocation, useParams } from "react-router-dom";
 
 import { useKnowledge } from "../../knowledge/KnowledgeContext";
 import { selectPrimaryText } from "./contentPresentation";
 
 export function ContentPage() {
   const { contentId } = useParams<{ contentId: string }>();
+  const location = useLocation();
   const repository = useKnowledge();
   const content = contentId ? repository.contentById.get(contentId) : undefined;
+  const returnTo = (location.state as { returnTo?: unknown } | null)?.returnTo;
+  const resultsPath =
+    typeof returnTo === "string" &&
+    (returnTo === "/buscar" || returnTo.startsWith("/buscar?"))
+      ? returnTo
+      : "/buscar";
 
   if (!content) {
     return (
@@ -23,7 +30,7 @@ export function ContentPage() {
 
   return (
     <article className="content-page">
-      <Link to="/buscar">Volver a resultados</Link>
+      <Link to={resultsPath}>Volver a resultados</Link>
 
       <section className="content-page__primary">
         <h1>{primary.label}</h1>

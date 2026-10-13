@@ -154,6 +154,22 @@ describe("Knowledge search UI", () => {
     expect(screen.queryByText(/Resultado 1/i)).not.toBeInTheDocument();
   });
 
+  it("returns from a result to the exact filtered search that opened it", async () => {
+    const user = userEvent.setup();
+    const record = content("018");
+    renderAt("/buscar?q=bisagras&type=hardware", [record]);
+
+    await user.click(screen.getByRole("link", { name: /ver contenido/i }));
+    expect(screen.getByTestId("location")).toHaveTextContent(
+      `/contenido/${record.content_id}`,
+    );
+
+    await user.click(screen.getByRole("link", { name: /volver a resultados/i }));
+    expect(screen.getByTestId("location")).toHaveTextContent(
+      "/buscar?q=bisagras&type=hardware",
+    );
+  });
+
   it("handles empty and manipulated URL parameters without fake categories", () => {
     renderAt("/buscar?q=%20%20&type=not-real", [content("001")]);
 

@@ -1,9 +1,10 @@
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 
 import { getContentTypeLabel } from "../../knowledge/contentTypes";
 import type { KnowledgeHit } from "../../knowledge/searchKnowledge";
 
 export function SearchResultCard({ hit }: { hit: KnowledgeHit }) {
+  const location = useLocation();
   const preview = hit.content.learning_text.trim() || hit.content.normalized_text.trim();
   const context = [
     hit.page.chapter,
@@ -20,7 +21,12 @@ export function SearchResultCard({ hit }: { hit: KnowledgeHit }) {
       </p>
       {preview ? <p>{preview}</p> : null}
       <p className="search-result-card__context">{context}</p>
-      <Link to={`/contenido/${hit.content.content_id}`}>Ver contenido</Link>
+      <Link
+        to={`/contenido/${hit.content.content_id}`}
+        state={{ returnTo: `${location.pathname}${location.search}` }}
+      >
+        Ver contenido
+      </Link>
     </article>
   );
 }
