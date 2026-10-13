@@ -1,0 +1,23 @@
+name: CarpiNova PC CI
+
+on:
+  push:
+    branches:
+      - design/knowledge-explorer-mvp1-20261012
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install dependencies
+        run: npm install
+      - name: Task 1 RED
+        run: npm test -- tests/app-shell.test.tsx
