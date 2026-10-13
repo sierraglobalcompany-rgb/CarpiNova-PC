@@ -60,10 +60,12 @@ describe("Bootstrap", () => {
     expect(screen.getByText(/cargando conocimiento/i)).toBeInTheDocument();
     expect(
       await screen.findByRole("heading", {
-        name: "Explora carpintería paso a paso",
+        name: "Aprende carpintería desde cero",
       }),
     ).toBeInTheDocument();
-    expect(screen.getByRole("searchbox", { name: /buscar en carpinova/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole("searchbox", { name: /buscar en carpinova/i }),
+    ).toBeInTheDocument();
     expect(screen.queryByText(ERROR_COPY)).not.toBeInTheDocument();
     expect(load).toHaveBeenCalledTimes(1);
   });
@@ -82,7 +84,7 @@ describe("Bootstrap", () => {
     ).not.toBeInTheDocument();
     expect(
       screen.queryByRole("heading", {
-        name: "Explora carpintería paso a paso",
+        name: "Aprende carpintería desde cero",
       }),
     ).not.toBeInTheDocument();
   });
