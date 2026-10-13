@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import { describe, expect, it } from "vitest";
@@ -97,27 +97,88 @@ function renderAt(initialEntry: string, records: ContentRecord[]) {
 }
 
 describe("Knowledge search UI", () => {
-  it("renders only available categories and navigates a submitted search", async () => {
+  it("renders the beginner dashboard with priority order and all known categories", async () => {
     const user = userEvent.setup();
     renderAt("/", [
-      content("001", { content_type: "hardware" }),
-      content("002", {
-        content_type: "material",
-        learning_text: "Tablero MDF para muebles.",
-        normalized_text: "tablero mdf",
-        tags: ["mdf"],
-      }),
+      content("001", { content_type: "warning" }),
+      content("002", { content_type: "hardware" }),
+      content("003", { content_type: "definition" }),
+      content("004", { content_type: "material" }),
+      content("005", { content_type: "procedure" }),
+      content("006", { content_type: "construction_pattern" }),
     ]);
 
-    expect(screen.getByRole("searchbox", { name: /buscar en carpinova/i })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Herrajes" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Materiales" })).toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: "Procedimientos" })).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Aprende carpintería desde cero" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("searchbox", { name: /buscar en carpinova/i }),
+    ).toBeInTheDocument();
 
-    await user.type(screen.getByRole("searchbox", { name: /buscar en carpinova/i }), "bisagras");
+    const startHere = screen.getByRole("region", { name: "Empieza aquí" });
+    expect(
+      within(startHere).getAllByRole("link").map((link) => link.textContent),
+    ).toEqual([
+      "Materiales",
+      "Herrajes",
+      "Procedimientos",
+      "Sistemas constructivos",
+      "Advertencias",
+    ]);
+
+    const exploreAll = screen.getByRole("region", { name: "Explora todo" });
+    expect(
+      within(exploreAll).getByRole("link", { name: "Materiales" }),
+    ).toHaveAttribute("href", "/buscar?type=material");
+    expect(
+      within(exploreAll).getByRole("link", { name: "Definiciones" }),
+    ).toBeInTheDocument();
+
+    await user.type(
+      screen.getByRole("searchbox", { name: /buscar en carpinova/i }),
+      "bisagras",
+    );
     await user.click(screen.getByRole("button", { name: "Buscar" }));
 
     expect(screen.getByTestId("location")).toHaveTextContent("/buscar?q=bisagras");
+  });
+
+  it("omits Empieza aquí when no priority type is available", () => {
+    renderAt("/", [content("010", { content_type: "definition" })]);
+
+    expect(
+      screen.queryByRole("region", { name: "Empieza aquí" }),
+    ).not.toBeInTheDocument();
+
+    const exploreAll = screen.getByRole("region", { name: "Explora todo" });
+    expect(
+      within(exploreAll).getByRole("link", { name: "Definiciones" }),
+    ).toBeInTheDocument();
+  });
+
+  it("ignores unknown content types in both dashboard sections", () => {
+    renderAt("/", [
+      content("011", { content_type: "definition" }),
+      content("012", { content_type: "not-real" }),
+    ]);
+
+    expect(
+      screen.queryByRole("region", { name: "Empieza aquí" }),
+    ).not.toBeInTheDocument();
+    const exploreAll = screen.getByRole("region", { name: "Explora todo" });
+    expect(within(exploreAll).queryByText("not-real")).not.toBeInTheDocument();
+  });
+
+  it("navigates a start-here category through the existing search route", async () => {
+    const user = userEvent.setup();
+    renderAt("/", [content("013", { content_type: "hardware" })]);
+
+    const startHere = screen.getByRole("region", { name: "Empieza aquí" });
+    await user.click(within(startHere).getByRole("link", { name: "Herrajes" }));
+
+    expect(screen.getByTestId("location")).toHaveTextContent(
+      "/buscar?type=hardware",
+    );
   });
 
   it("navigates a category and lists all records of that type without q", async () => {
@@ -128,7 +189,8 @@ describe("Knowledge search UI", () => {
       content("003", { content_type: "material", learning_text: "MDF" }),
     ]);
 
-    await user.click(screen.getByRole("link", { name: "Herrajes" }));
+    const exploreAll = screen.getByRole("region", { name: "Explora todo" });
+    await user.click(within(exploreAll).getByRole("link", { name: "Herrajes" }));
 
     expect(screen.getByTestId("location")).toHaveTextContent("/buscar?type=hardware");
     expect(screen.getByText("Bisagra uno")).toBeInTheDocument();
@@ -143,14 +205,13 @@ describe("Knowledge search UI", () => {
     renderAt("/buscar?q=bisagras", [record]);
 
     expect(screen.getAllByText("Herrajes").length).toBeGreaterThan(0);
-    expect(screen.getByText("Explicación sencilla sobre bisagras de cazoleta.")).toBeInTheDocument();
+    expect(
+      screen.getByText("Explicación sencilla sobre bisagras de cazoleta."),
+    ).toBeInTheDocument();
     expect(screen.getByText(/Herrajes.*Instalación.*Página PDF 1/)).toBeInTheDocument();
 
     const link = screen.getByRole("link", { name: /ver contenido/i });
-    expect(link).toHaveAttribute(
-      "href",
-      `/contenido/${record.content_id}`,
-    );
+    expect(link).toHaveAttribute("href", `/contenido/${record.content_id}`);
     expect(screen.queryByText(/Resultado 1/i)).not.toBeInTheDocument();
   });
 
@@ -173,14 +234,18 @@ describe("Knowledge search UI", () => {
   it("handles empty and manipulated URL parameters without fake categories", () => {
     renderAt("/buscar?q=%20%20&type=not-real", [content("001")]);
 
-    expect(screen.getByText(/busca un término o elige una categoría/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/busca un término o elige una categoría/i),
+    ).toBeInTheDocument();
     expect(screen.queryByText("not-real")).not.toBeInTheDocument();
   });
 
   it("ignores an unknown manual type filter when a real query exists", () => {
     renderAt("/buscar?q=bisagras&type=not-real", [content("001")]);
 
-    expect(screen.getByText("Explicación sencilla sobre bisagras.")).toBeInTheDocument();
+    expect(
+      screen.getByText("Explicación sencilla sobre bisagras."),
+    ).toBeInTheDocument();
     expect(screen.queryByText("not-real")).not.toBeInTheDocument();
   });
 });
