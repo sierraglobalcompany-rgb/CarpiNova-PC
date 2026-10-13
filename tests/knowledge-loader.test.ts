@@ -25,11 +25,11 @@ function manifest(overrides: Record<string, unknown> = {}) {
 
 function page(overrides: Record<string, unknown> = {}) {
   return {
-    page_id: "P0001",
+    page_id: "PAGE-CPNC-2025-P0001",
     book_id: "cpnc-2025",
     pdf_page: 1,
     printed_page: null,
-    mapping_status: "EXACT",
+    mapping_status: "verified",
     chapter: "Introducción",
     section: "Conceptos",
     ...overrides,
@@ -38,14 +38,20 @@ function page(overrides: Record<string, unknown> = {}) {
 
 function content(overrides: Record<string, unknown> = {}) {
   return {
-    content_id: "C0001",
-    page_id: "P0001",
+    content_id: "CONTENT-CPNC-2025-P0001-001",
+    page_id: "PAGE-CPNC-2025-P0001",
     content_type: "concept",
     source_transcription: "Texto original",
     normalized_text: "Texto normalizado",
     learning_text: "Explicación sencilla",
-    derived_from_content_ids: [],
-    source: { page_id: "P0001" },
+    derived_from_content_ids: ["CONTENT-CPNC-2025-P0001-001"],
+    source: {
+      book_id: "cpnc-2025",
+      pdf_page: 1,
+      printed_page: null,
+      region: { x: 0, y: 0, width: 1, height: 1 },
+      extraction: { method: "text", confidence: 1, review_status: "VALIDATED" },
+    },
     tags: ["inicio"],
     ...overrides,
   };
@@ -89,8 +95,8 @@ describe("runtime Knowledge boundary", () => {
       }),
     );
 
-    expect(repository.contentById.get("C0001")?.page_id).toBe("P0001");
-    expect(repository.pagesById.get("P0001")?.pdf_page).toBe(1);
+    expect(repository.contentById.get("CONTENT-CPNC-2025-P0001-001")?.page_id).toBe("PAGE-CPNC-2025-P0001");
+    expect(repository.pagesById.get("PAGE-CPNC-2025-P0001")?.pdf_page).toBe(1);
   });
 
   it.each([
@@ -110,22 +116,22 @@ describe("runtime Knowledge boundary", () => {
   it("rejects duplicate page IDs", () => {
     expect(() =>
       buildKnowledgeRepository(manifest(), bundle({ pages: [page(), page()] })),
-    ).toThrow("P0001");
+    ).toThrow("PAGE-CPNC-2025-P0001");
   });
 
   it("rejects duplicate content IDs", () => {
     expect(() =>
       buildKnowledgeRepository(manifest(), bundle({ content: [content(), content()] })),
-    ).toThrow("C0001");
+    ).toThrow("CONTENT-CPNC-2025-P0001-001");
   });
 
   it("rejects content that references a missing page", () => {
     expect(() =>
       buildKnowledgeRepository(
         manifest(),
-        bundle({ content: [content({ page_id: "P9999" })] }),
+        bundle({ content: [content({ page_id: "PAGE-CPNC-2025-P9999" })] }),
       ),
-    ).toThrow("P9999");
+    ).toThrow("PAGE-CPNC-2025-P9999");
   });
 
   it("fails closed when a Knowledge asset cannot be fetched", async () => {
