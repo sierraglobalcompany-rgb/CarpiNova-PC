@@ -1,7 +1,7 @@
 # CarpiNova-PC — Dashboard educativo MVP 2
 
 **Fecha:** 2026-10-13  
-**Estado:** DESIGN APPROVED — pendiente de revisión del documento por el usuario  
+**Estado:** DESIGN APPROVED  
 **Rama de diseño:** `design/dashboard-mvp2-20261013`  
 **Base:** `main` @ `61cd87c452db4a308fe8e5fe926e6987b8c83eea`  
 **Predecesor estable:** Knowledge Explorer MVP 1 — CLOSED / GREEN

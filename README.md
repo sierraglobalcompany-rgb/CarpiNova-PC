@@ -1,17 +1,18 @@
-# CarpiNova-PC — Knowledge Explorer MVP 1
+# CarpiNova-PC — Knowledge Explorer + Dashboard educativo MVP 2
 
-CarpiNova-PC es el consumidor web local de `CarpiNova-Knowledge 1.0.0`. Este MVP permite buscar, filtrar y abrir fichas pedagógicas trazables sin duplicar ni reinterpretar el conocimiento canónico.
+CarpiNova-PC es el consumidor web local de `CarpiNova-Knowledge 1.0.0`. Permite buscar, filtrar y abrir fichas pedagógicas trazables sin duplicar ni reinterpretar el conocimiento canónico, y añade un dashboard educativo para orientar a principiantes.
 
-## Alcance del MVP
+## Alcance actual
 
 - React + Vite + TypeScript.
 - Ejecución local mediante `localhost`.
+- Dashboard educativo de inicio con **Empieza aquí** y **Explora todo**, reutilizando categorías reales del Knowledge.
 - Búsqueda determinística y filtros por `content_type`.
 - `learning_text` como explicación principal, con fallback explícito a `normalized_text` y después `source_transcription`.
 - Procedencia visible por página/fuente.
 - Comportamiento fail-closed si Knowledge falta o no cumple el contrato esperado.
 
-No incluye backend, base de datos, Docker, cuentas, IA, embeddings, búsqueda vectorial, dashboard, CAD/3D, Furniture Engine ni reglas automáticas de fabricación.
+No incluye backend, base de datos, Docker, cuentas, IA, embeddings, búsqueda vectorial, CAD/3D, Furniture Engine ni reglas automáticas de fabricación.
 
 ## Requisitos
 
