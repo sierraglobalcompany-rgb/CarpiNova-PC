@@ -135,12 +135,12 @@ describe("content presentation", () => {
     await user.click(screen.getByText("Ver fuente"));
 
     expect(screen.getByText("Transcripción exacta de la fuente.")).toBeInTheDocument();
-    expect(screen.getByText(/Página PDF 1/)).toBeInTheDocument();
-    expect(screen.getByText(/Página impresa 12/)).toBeInTheDocument();
-    expect(screen.getByText(/Herrajes/)).toBeInTheDocument();
-    expect(screen.getByText(/Instalación/)).toBeInTheDocument();
-    expect(screen.getByText(/Método: visual/)).toBeInTheDocument();
-    expect(screen.getByText(/Estado: VALIDATED/)).toBeInTheDocument();
+    expect(screen.getByText("Página PDF").parentElement).toHaveTextContent("Página PDF1");
+    expect(screen.getByText("Página impresa").parentElement).toHaveTextContent("Página impresa12");
+    expect(screen.getByText("Herrajes")).toBeInTheDocument();
+    expect(screen.getByText("Instalación")).toBeInTheDocument();
+    expect(screen.getByText("Método").parentElement).toHaveTextContent("Métodovisual");
+    expect(screen.getByText("Estado").parentElement).toHaveTextContent("EstadoVALIDATED");
   });
 
   it("omits null printed-page output and handles an unknown content id clearly", () => {
