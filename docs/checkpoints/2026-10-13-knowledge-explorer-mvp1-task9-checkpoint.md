@@ -1,4 +1,4 @@
-# CarpiNova-PC MVP 1 — Checkpoint Task 9 before Windows acceptance
+# CarpiNova-PC MVP 1 — Checkpoint Task 9 before local visual acceptance
 
 Date: 2026-10-13
 Branch: `design/knowledge-explorer-mvp1-20261012`
@@ -24,35 +24,75 @@ Task 8 certification run:
 STATUS: PARTIAL / NOT CLOSED.
 
 Completed in Task 9:
-- `README.md` now documents the reproducible local flow and final acceptance gate;
+- `README.md` documents the reproducible local flow and final acceptance gate;
 - `package-lock.json` is committed and reproducible;
-- CI now uses `npm ci`;
+- CI uses `npm ci`;
 - final CI permissions are `contents: read`;
 - dependency security issue found during audit was resolved instead of ignored:
   - `react-router-dom` upgraded to `^7.18.4`;
   - `vitest` upgraded to `^5.0.4`;
   - explicit Node types added to `tsconfig.app.json` for test typechecking;
 - npm resolution reported `0 vulnerabilities` after the upgrades;
-- final read-only reproducible CI is GREEN.
+- final read-only reproducible PC CI is GREEN.
 
-Final reproducible CI run before this checkpoint:
+PC CI run:
 - run `38346140824` — SUCCESS;
 - `npm ci` — PASS;
 - tests — PASS (`37/37`);
 - typecheck — PASS;
 - build — PASS.
 
-## Current branch state before checkpoint commit
+## Cross-repository Windows verification — CERTIFIED
 
-HEAD before writing this checkpoint:
-`40c2bc272d2136b8ee19de77f87be02d6d357820`
+A temporary verification branch was created from `CarpiNova-Knowledge/main` only to execute a real Windows cross-repository gate. It was not merged into Knowledge main and did not modify CarpiNova-PC application code.
 
-Latest code/documentation state includes:
-- Task 8 bootstrap GREEN;
-- final `README.md`;
-- committed `package-lock.json`;
-- final read-only CI using `npm ci`;
-- dependency upgrades with zero known npm audit vulnerabilities at the certified resolution.
+Verified CarpiNova-PC commit:
+`0ba91c59379d6f859892971aa325f37630e1c65d`
+
+Canonical Knowledge was checked out from the private repository and consumed through the real `knowledge:prepare` command on a GitHub Actions Windows Server 2025 runner.
+
+Final successful integration run:
+- repository: `sierraglobalcompany-rgb/CarpiNova-Knowledge`;
+- temporary branch: `verify/pc-mvp1-windows-20261013`;
+- workflow run: `38347622078` — SUCCESS;
+- workflow verification commit: `98009c778c0ceaa312fcc23029fcda4a21ac9639`.
+
+The successful Windows run freshly verified:
+- canonical Knowledge validator — PASS (`valid=true`, `error_count=0`);
+- exact PC checkpoint SHA — PASS;
+- `npm ci` — PASS;
+- npm audit result during install — `0 vulnerabilities`;
+- tests — PASS (`37/37`);
+- typecheck — PASS;
+- build — PASS;
+- real `npm run knowledge:prepare` against the private canonical Knowledge checkout — PASS;
+- generated manifest contract — PASS;
+- artifact SHA-256 values independently rechecked against the manifest — PASS;
+- `generated/knowledge/manifest.json` ignored by Git — PASS;
+- production build contains `dist/knowledge/manifest.json` — PASS;
+- programmatic Vite preview served `/` and `/knowledge/manifest.json` — PASS;
+- served preview reported `knowledge_version = 1.0.0` — PASS.
+
+Manifest identifiers certified in the Windows gate:
+
+```text
+knowledge_version = 1.0.0
+book_id = cpnc-2025
+scope = BOOK
+source_manifest_sha256 = 318ceb94569608bfe062e3e50c7032edee79febf06102f7eec760769a6dfd90c
+```
+
+Actual distributed search-field probes on real Knowledge 1.0.0:
+
+```text
+bisagras   = 25 matching content records
+correderas = 16 matching content records
+MDF        = 7 matching content records
+tapacanto  = 28 matching content records
+gabinete   = 15 matching content records
+```
+
+Therefore no fallback/replacement term is required for the five planned acceptance probes.
 
 ## Scope / noise audit already performed
 
@@ -70,44 +110,15 @@ Automated tree comparison against `main` found no committed:
 
 `.gitignore` includes `/generated/`, `/dist/` and `/node_modules/`.
 
-The temporary CI mechanisms used only to materialize and audit the lockfile have been removed from the current workflow. Current CI is read-only.
+The temporary CI mechanisms used only to materialize and audit the PC lockfile have been removed from the current PC workflow. Current PC CI is read-only.
 
-## Exact remaining work when resuming
+## Exact remaining work
 
-Do not claim MVP completion yet. The remaining gate requires a real Windows/local acceptance against canonical `CarpiNova-Knowledge 1.0.0`.
+Do not claim MVP completion yet. The technical Windows integration is certified, but the accepted MVP gate still requires a **human-visible local acceptance on the user's PC**.
 
-1. On the Windows workstation, use the implementation branch and run:
+The remaining checks are only:
 
-```bash
-npm ci
-npm test
-npm run typecheck
-npm run build
-```
-
-2. Prepare the real canonical Knowledge repository:
-
-```bash
-npm run knowledge:prepare -- --knowledge-root "<ruta-real-a-CarpiNova-Knowledge>"
-```
-
-Expected manifest contract:
-
-```text
-knowledge_version = 1.0.0
-book_id = cpnc-2025
-scope = BOOK
-source_manifest_sha256 = 318ceb94569608bfe062e3e50c7032edee79febf06102f7eec760769a6dfd90c
-```
-
-3. Confirm generated Knowledge remains ignored:
-
-```bash
-git status --short
-git check-ignore generated/knowledge/manifest.json
-```
-
-4. Start the real app and perform manual probes against actual Knowledge:
+1. Open the app locally against the prepared canonical Knowledge and verify the visible path with the real probes:
 
 ```text
 bisagras
@@ -117,22 +128,13 @@ tapacanto
 gabinete
 ```
 
-For every present term verify:
+For the visible flow confirm:
 
 ```text
 buscar -> filtrar -> abrir ficha -> leer explicación/fallback -> Ver fuente -> comprobar procedencia
 ```
 
-If a probe is genuinely absent from Knowledge 1.0.0, record it as absent and replace it with another canonical present term of the same broad class. Never add manual taxonomy to make a probe pass.
-
-5. Run preview and responsive smoke:
-
-```bash
-npm run build
-npm run preview
-```
-
-Check approximately:
+2. Perform the manual responsive/browser smoke approximately at:
 
 ```text
 1440 px
@@ -140,15 +142,20 @@ Check approximately:
 390 px
 ```
 
-Verify no horizontal overflow, readable content, usable filters and visible keyboard focus.
+Confirm:
+- no horizontal overflow;
+- readable content;
+- usable filters;
+- visible keyboard focus;
+- navigation/back behavior remains usable.
 
-6. Only after those checks actually run, create:
+3. Only after the visible checks actually run, create:
 
 `docs/verification/knowledge-explorer-mvp1-local.md`
 
-Record real date, branch/commit, Knowledge manifest identifiers, commands, actual probe results, responsive checks and any remaining observations. Never record PASS for an unexecuted check.
+Record real date, branch/commit, Knowledge manifest identifiers, automated Windows evidence, actual visible probe results, responsive checks and any remaining observations. Never record PASS for an unexecuted check.
 
-7. Re-run the final scope/noise audit and commit the verification record.
+4. Re-run the final scope/noise audit and commit the verification record.
 
 ## Guardrails on resume
 
@@ -157,8 +164,8 @@ Record real date, branch/commit, Knowledge manifest identifiers, commands, actua
 - Do not commit generated Knowledge.
 - Do not infer/reconcile unresolved technical data.
 - No direct commits to `main`.
-- Do not claim MVP completion until the real Windows Knowledge preparation + visible flow + preview/responsive acceptance are certified.
+- Do not claim MVP completion until the visible local flow + responsive acceptance are certified.
 
 ## Resume point
 
-Resume exactly at **Task 9 real Windows/local acceptance**. Do not reopen Tasks 1–8 unless a real acceptance defect demonstrates a regression.
+Resume exactly at **Task 9 human-visible local acceptance**. The technical Windows + canonical Knowledge gate is already GREEN; do not rerun it unless a real defect or code change invalidates the evidence.
