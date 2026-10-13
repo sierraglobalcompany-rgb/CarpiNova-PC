@@ -65,9 +65,34 @@ export interface KnowledgeBundle {
   taxonomy: Record<string, unknown>;
 }
 
+export interface LessonStep {
+  order: number;
+  title: string;
+  content_ids: string[];
+  figure_ids?: string[];
+  interaction?: Record<string, unknown>;
+}
+
+export interface LessonRecord {
+  lesson_id: string;
+  title: string;
+  source_content_ids: string[];
+  steps: LessonStep[];
+}
+
+export interface LessonsBundle {
+  schema_version?: string;
+  knowledge_version?: string;
+  book_id?: string;
+  scope?: string;
+  lessons: LessonRecord[];
+}
+
 export interface KnowledgeRepository {
   manifest: KnowledgeManifest;
   bundle: KnowledgeBundle;
   pagesById: Map<string, PageRecord>;
   contentById: Map<string, ContentRecord>;
+  lessons: LessonRecord[];
+  lessonsById: Map<string, LessonRecord>;
 }

@@ -90,6 +90,8 @@ function repository(record = content(), pageRecord: PageRecord = page): Knowledg
     },
     pagesById: new Map([[pageRecord.page_id, pageRecord]]),
     contentById: new Map([[record.content_id, record]]),
+    lessons: [],
+    lessonsById: new Map(),
   };
 }
 

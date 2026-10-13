@@ -3,6 +3,9 @@ import type {
   KnowledgeBundle,
   KnowledgeManifest,
   KnowledgeRepository,
+  LessonRecord,
+  LessonsBundle,
+  LessonStep,
   MappingStatus,
   PageRecord,
   SourceRecord,
@@ -35,6 +38,13 @@ function numberField(value: unknown, label: string): number {
     throw new Error(`${label} must be a number`);
   }
   return value;
+}
+
+function stringArrayField(value: unknown, label: string): string[] {
+  if (!Array.isArray(value) || !value.every((item) => typeof item === "string")) {
+    throw new Error(`${label} must be an array of strings`);
+  }
+  return [...value] as string[];
 }
 
 function validateManifest(value: unknown): KnowledgeManifest {
@@ -115,38 +125,43 @@ function validatePage(value: unknown, index: number): PageRecord {
     mapping_status: mappingStatus as MappingStatus,
     chapter:
       item.chapter === undefined || item.chapter === null
-        ? item.chapter as undefined | null
+        ? (item.chapter as undefined | null)
         : stringField(item.chapter, `pages[${index}].chapter`),
     section:
       item.section === undefined || item.section === null
-        ? item.section as undefined | null
+        ? (item.section as undefined | null)
         : stringField(item.section, `pages[${index}].section`),
   };
 }
 
 function validateContent(value: unknown, index: number): ContentRecord {
   const item = record(value, `content[${index}]`);
-  if (!Array.isArray(item.derived_from_content_ids) || !item.derived_from_content_ids.every((id) => typeof id === "string")) {
-    throw new Error(`content[${index}].derived_from_content_ids must be an array of strings`);
-  }
-  if (item.tags !== undefined && (!Array.isArray(item.tags) || !item.tags.every((tag) => typeof tag === "string"))) {
-    throw new Error(`content[${index}].tags must be an array of strings`);
-  }
+  const derivedFrom = stringArrayField(
+    item.derived_from_content_ids,
+    `content[${index}].derived_from_content_ids`,
+  );
+  const tags =
+    item.tags === undefined
+      ? undefined
+      : stringArrayField(item.tags, `content[${index}].tags`);
 
   return {
     content_id: stringField(item.content_id, `content[${index}].content_id`),
     page_id: stringField(item.page_id, `content[${index}].page_id`),
     content_type: stringField(item.content_type, `content[${index}].content_type`),
-    source_transcription: stringField(item.source_transcription, `content[${index}].source_transcription`),
+    source_transcription: stringField(
+      item.source_transcription,
+      `content[${index}].source_transcription`,
+    ),
     normalized_text: stringField(item.normalized_text, `content[${index}].normalized_text`),
     learning_text: stringField(item.learning_text, `content[${index}].learning_text`),
-    derived_from_content_ids: [...item.derived_from_content_ids] as string[],
+    derived_from_content_ids: derivedFrom,
     source: validateSource(item.source, `content[${index}].source`),
     external_source:
       item.external_source === undefined
         ? undefined
         : record(item.external_source, `content[${index}].external_source`),
-    tags: item.tags === undefined ? undefined : [...item.tags] as string[],
+    tags,
   };
 }
 
@@ -190,9 +205,127 @@ function validateBundle(value: unknown): KnowledgeBundle {
   };
 }
 
+function validateLessonStep(
+  value: unknown,
+  lessonIndex: number,
+  stepIndex: number,
+): LessonStep {
+  const label = `lessons[${lessonIndex}].steps[${stepIndex}]`;
+  const item = record(value, label);
+  const order = numberField(item.order, `${label}.order`);
+  if (!Number.isInteger(order) || order <= 0) {
+    throw new Error(`${label}.order must be a positive integer`);
+  }
+
+  return {
+    order,
+    title: stringField(item.title, `${label}.title`),
+    content_ids: stringArrayField(item.content_ids, `${label}.content_ids`),
+    figure_ids:
+      item.figure_ids === undefined
+        ? undefined
+        : stringArrayField(item.figure_ids, `${label}.figure_ids`),
+    interaction:
+      item.interaction === undefined
+        ? undefined
+        : { ...record(item.interaction, `${label}.interaction`) },
+  };
+}
+
+function validateLesson(value: unknown, index: number): LessonRecord {
+  const label = `lessons[${index}]`;
+  const item = record(value, label);
+  if (!Array.isArray(item.steps)) {
+    throw new Error(`${label}.steps must be an array`);
+  }
+
+  const steps = item.steps.map((stepValue, stepIndex) =>
+    validateLessonStep(stepValue, index, stepIndex),
+  );
+  const seenOrders = new Set<number>();
+  for (const step of steps) {
+    if (seenOrders.has(step.order)) {
+      throw new Error(`${label}.steps contains duplicate order ${step.order}`);
+    }
+    seenOrders.add(step.order);
+  }
+
+  return {
+    lesson_id: stringField(item.lesson_id, `${label}.lesson_id`),
+    title: stringField(item.title, `${label}.title`),
+    source_content_ids: stringArrayField(
+      item.source_content_ids,
+      `${label}.source_content_ids`,
+    ),
+    steps: [...steps].sort((a, b) => a.order - b.order),
+  };
+}
+
+function validateLessonsBundle(
+  value: unknown,
+  manifest: KnowledgeManifest,
+  contentById: Map<string, ContentRecord>,
+): LessonsBundle {
+  const bundle = record(value, "lessons.bundle.json");
+  if (!Array.isArray(bundle.lessons)) {
+    throw new Error("lessons must be an array");
+  }
+
+  const identities: Array<keyof Pick<
+    KnowledgeManifest,
+    "knowledge_version" | "book_id" | "scope"
+  >> = ["knowledge_version", "book_id", "scope"];
+  for (const field of identities) {
+    if (bundle[field] === undefined) {
+      continue;
+    }
+    const actual = stringField(bundle[field], `lessons.${field}`);
+    if (actual !== manifest[field]) {
+      throw new Error(`lessons.${field} must be ${manifest[field]}`);
+    }
+  }
+
+  const lessons = bundle.lessons.map(validateLesson);
+  const lessonsById = new Set<string>();
+  for (const lesson of lessons) {
+    if (lessonsById.has(lesson.lesson_id)) {
+      throw new Error(`Duplicate lesson_id: ${lesson.lesson_id}`);
+    }
+    lessonsById.add(lesson.lesson_id);
+
+    for (const contentId of lesson.source_content_ids) {
+      if (!contentById.has(contentId)) {
+        throw new Error(`Lesson ${lesson.lesson_id} references missing content_id ${contentId}`);
+      }
+    }
+    for (const step of lesson.steps) {
+      for (const contentId of step.content_ids) {
+        if (!contentById.has(contentId)) {
+          throw new Error(`Lesson ${lesson.lesson_id} references missing content_id ${contentId}`);
+        }
+      }
+    }
+  }
+
+  return {
+    schema_version:
+      bundle.schema_version === undefined
+        ? undefined
+        : stringField(bundle.schema_version, "lessons.schema_version"),
+    knowledge_version:
+      bundle.knowledge_version === undefined
+        ? undefined
+        : (bundle.knowledge_version as string),
+    book_id: bundle.book_id === undefined ? undefined : (bundle.book_id as string),
+    scope: bundle.scope === undefined ? undefined : (bundle.scope as string),
+    lessons,
+  };
+}
+
 export function buildKnowledgeRepository(
   manifestValue: unknown,
   bundleValue: unknown,
+  lessonsValue: unknown,
 ): KnowledgeRepository {
   const manifest = validateManifest(manifestValue);
   const bundle = validateBundle(bundleValue);
@@ -219,7 +352,19 @@ export function buildKnowledgeRepository(
     contentById.set(item.content_id, item);
   }
 
-  return { manifest, bundle, pagesById, contentById };
+  const lessonsBundle = validateLessonsBundle(lessonsValue, manifest, contentById);
+  const lessonsById = new Map(
+    lessonsBundle.lessons.map((lesson) => [lesson.lesson_id, lesson] as const),
+  );
+
+  return {
+    manifest,
+    bundle,
+    pagesById,
+    contentById,
+    lessons: lessonsBundle.lessons,
+    lessonsById,
+  };
 }
 
 async function fetchJson(fetchImpl: typeof fetch, url: string): Promise<unknown> {
@@ -241,5 +386,6 @@ export async function loadKnowledge(
   const base = baseUrl.replace(/\/+$/, "");
   const manifest = await fetchJson(fetchImpl, `${base}/manifest.json`);
   const bundle = await fetchJson(fetchImpl, `${base}/knowledge.bundle.json`);
-  return buildKnowledgeRepository(manifest, bundle);
+  const lessons = await fetchJson(fetchImpl, `${base}/lessons.bundle.json`);
+  return buildKnowledgeRepository(manifest, bundle, lessons);
 }
