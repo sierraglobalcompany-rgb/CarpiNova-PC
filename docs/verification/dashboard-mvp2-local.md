@@ -102,6 +102,6 @@ Smoke de teclado: Tab mostró foco visible en el buscador, el botón **Buscar**,
 
 ## Estado de cierre
 
-G0–G5 y la verificación fresca local G6: **PASS** (43/43 pruebas, typecheck, build y git diff --check). El CI de PR #3 run 38360146895 pasó instalación, pruebas, typecheck y build sobre 84c55b85c2d54fc01aac8bdc5f93761b3f04ef07. El PR se observó **OPEN + DRAFT + NOT MERGED**. Este cierre es docs-only y conserva PC_SHA_VISUALLY_TESTED; el CI del SHA final de este registro se vuelve a comprobar después del push.
+G0–G5 y la verificación fresca local G6: **PASS** (43/43 pruebas, typecheck, build y git diff --check). El CI de PR #3 run 38360146895 pasó instalación, pruebas, typecheck y build sobre 84c55b85c2d54fc01aac8bdc5f93761b3f04ef07. La verificación de CI posterior, run 38360531843, también pasó instalación, pruebas, typecheck y build sobre df95ecdfe5d58ed0c403f48eabc3bd4b22a48f62. El PR se observó **OPEN + DRAFT + NOT MERGED**. Este registro es docs-only y conserva PC_SHA_VISUALLY_TESTED.
 
 MVP2_DASHBOARD_LOCAL_ACCEPTANCE_PASS
