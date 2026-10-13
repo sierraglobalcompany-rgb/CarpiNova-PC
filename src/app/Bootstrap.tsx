@@ -8,7 +8,7 @@ import { AppShell } from "./AppShell";
 import { AppRoutes } from "./routes";
 
 export const KNOWLEDGE_LOAD_ERROR =
-  "No se pudo cargar CarpiNova Knowledge 1.0.0. Ejecuta la preparación del conocimiento y vuelve a intentar.";
+  "No se pudo cargar CarpiNova Knowledge. Ejecuta la preparación del conocimiento y vuelve a intentar.";
 
 type BootstrapState =
   | { status: "loading" }
