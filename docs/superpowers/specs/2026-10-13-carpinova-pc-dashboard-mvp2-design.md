@@ -35,7 +35,7 @@ La solución debe ser:
 - simple;
 - local-first;
 - determinística;
-- reutilizar las rutas y servicios existentes;
+- reutilizar las rutas y componentes existentes;
 - sin infraestructura adicional;
 - sin nueva dependencia salvo necesidad demostrada;
 - sin estado global nuevo;
@@ -79,7 +79,7 @@ El MVP 2 convierte la ruta `/` en un dashboard educativo para principiantes comp
 
 El buscador actual continúa siendo una acción principal visible.
 
-No se crean nuevas rutas obligatorias.
+No se crean nuevas rutas.
 
 Las rutas existentes permanecen:
 
@@ -119,7 +119,7 @@ Su finalidad es reducir la carga inicial de decisión para un principiante.
 
 Los tipos prioritarios son, en este orden:
 
-| Prioridad | `content_type` canónico | Etiqueta existente |
+| Prioridad | `content_type` conocido | Etiqueta existente |
 |---|---|---|
 | 1 | `material` | Materiales |
 | 2 | `hardware` | Herrajes |
@@ -129,7 +129,9 @@ Los tipos prioritarios son, en este orden:
 
 Esta lista es una **prioridad de interfaz**, no una taxonomía nueva.
 
-Cada tarjeta enlaza al flujo existente:
+La sección reutiliza `CategoryFilter` con el subconjunto prioritario realmente disponible.
+
+Cada enlace conserva el flujo ya existente:
 
 ```text
 /buscar?type=<content_type>
@@ -143,9 +145,9 @@ Materiales → /buscar?type=material
 
 ### 4.3 Regla de existencia
 
-Una tarjeta prioritaria solo puede mostrarse si ese `content_type` existe realmente en el bundle cargado.
+Un acceso prioritario solo puede mostrarse si ese `content_type` existe realmente en el bundle y además es reconocido por la lógica actual.
 
-La disponibilidad debe derivarse de la misma lógica canónica ya usada por:
+La disponibilidad debe derivarse de:
 
 ```ts
 getAvailableContentTypes(repository)
@@ -155,32 +157,28 @@ No se crean categorías vacías.
 
 No se inventan sustitutos.
 
-No se completa la cuadrícula con contenido manual si falta un tipo.
+No se completa la sección con contenido manual si falta un tipo.
 
 Si un tipo prioritario no existe, simplemente no se muestra.
 
-### 4.4 Contenido de la tarjeta
+### 4.4 Presentación de los accesos
 
-Cada tarjeta necesita únicamente:
+Cada acceso necesita únicamente:
 
-- nombre de categoría;
-- una llamada a la acción breve;
-- enlace real al explorador filtrado.
+- etiqueta de categoría ya existente;
+- comportamiento de enlace real al explorador filtrado.
 
 No requiere:
 
 - imagen remota;
 - iconografía de una librería nueva;
-- contenido técnico escrito a mano;
+- texto técnico escrito a mano;
 - conteos;
 - ranking;
-- recomendación automática.
+- recomendación automática;
+- componente nuevo dedicado.
 
-Si se usa texto secundario, debe ser puramente de navegación y no aportar hechos técnicos nuevos. Ejemplo aceptable:
-
-```text
-Explorar materiales
-```
+La diferencia visual frente a “Explora todo” se resuelve con CSS contextual sobre el mismo `CategoryFilter`, no mediante una segunda implementación de navegación.
 
 ### 4.5 Explora todo
 
@@ -190,13 +188,11 @@ Después de “Empieza aquí” aparece:
 Explora todo
 ```
 
-Este bloque conserva la capacidad completa del MVP 1 mostrando **todos los `content_type` realmente disponibles** mediante la lógica actual.
+Este bloque conserva la capacidad completa del MVP 1 mostrando **todos los `content_type` conocidos y realmente presentes** según `getAvailableContentTypes(repository)`.
 
-Debe reutilizar `CategoryFilter` o el mecanismo existente equivalente.
+Debe reutilizar el mismo `CategoryFilter`.
 
-No debe existir una segunda implementación de categorías.
-
-Los tipos prioritarios pueden aparecer también en “Explora todo”. Esto no se considera duplicación de conocimiento: una zona es orientación inicial y la otra es el índice completo. No se duplica contenido ni lógica de datos.
+Los tipos prioritarios pueden aparecer también en “Explora todo”. Esto no se considera duplicación de conocimiento: una zona orienta y la otra funciona como índice completo. No se duplica contenido ni lógica de datos.
 
 ## 5. Qué NO incluye el MVP 2
 
@@ -249,8 +245,8 @@ getAvailableContentTypes(repository)
         ↓
 HomePage
         ├── SearchForm existente
-        ├── Empieza aquí
-        └── CategoryFilter existente / Explora todo
+        ├── CategoryFilter(startHereTypes)
+        └── CategoryFilter(allAvailableTypes)
                      ↓
               /buscar?type=...
                      ↓
@@ -275,38 +271,18 @@ Responsabilidades:
 - obtener tipos disponibles mediante `getAvailableContentTypes`;
 - mantener `SearchForm`;
 - calcular la intersección entre tipos disponibles y los cinco tipos prioritarios;
-- renderizar “Empieza aquí”;
-- renderizar “Explora todo”.
+- renderizar una primera instancia de `CategoryFilter` para “Empieza aquí”;
+- renderizar una segunda instancia de `CategoryFilter` para “Explora todo”.
 
-La lógica debe permanecer pequeña y explícita.
+La lista de prioridad puede vivir como una constante pequeña y explícita junto a `HomePage`.
 
-### 7.2 Componente presentacional opcional
+No se crea un helper, hook, servicio, store ni provider nuevo para esta operación.
 
-Se permite **como máximo un componente presentacional pequeño** para las tarjetas de “Empieza aquí” si mejora claramente la legibilidad de `HomePage`.
+### 7.2 `CategoryFilter`
 
-Ejemplo posible:
+Se reutiliza sin cambiar su responsabilidad ni duplicar su construcción de URLs.
 
-```text
-BeginnerStart
-```
-
-No se crea:
-
-- service;
-- repository adicional;
-- store;
-- hook personalizado;
-- provider;
-- mapper de dominio;
-- configuración JSON independiente;
-
-salvo que una prueba real demuestre que es imprescindible.
-
-### 7.3 `CategoryFilter`
-
-Debe reutilizarse sin cambiar su propósito.
-
-Solo se modifica si existe una necesidad visual o de accesibilidad concreta demostrada durante implementación.
+Solo se modifica si una necesidad visual o de accesibilidad concreta lo exige y no puede resolverse mediante el contenedor/CSS existente.
 
 ## 8. Datos y reglas de derivación
 
@@ -335,7 +311,7 @@ warning
 Algoritmo esperado conceptualmente:
 
 ```text
-available = tipos realmente presentes
+available = tipos conocidos realmente presentes
 priority = [material, hardware, procedure, construction_pattern, warning]
 startHere = priority filtrado por available
 all = available
@@ -361,9 +337,10 @@ El dashboard no implementa fallback remoto ni datos embebidos.
 
 Si `startHere` queda vacío:
 
-- no se muestra una sección vacía;
+- no se muestra el encabezado “Empieza aquí”;
+- no se muestra una lista vacía;
 - el buscador continúa disponible;
-- “Explora todo” sigue mostrando los tipos reales disponibles.
+- “Explora todo” sigue mostrando los tipos conocidos y realmente presentes.
 
 No se inventa una categoría para llenar el espacio.
 
@@ -383,11 +360,11 @@ Se conserva la identidad visual “Taller moderno” aprobada en MVP 1:
 
 “Empieza aquí” debe tener mayor jerarquía visual que “Explora todo”, pero no debe desplazar el buscador fuera del primer viewport en escritorio de forma innecesaria.
 
-Las tarjetas deben ser reconocibles como enlaces y funcionar sin depender únicamente de color.
+Los enlaces prioritarios deben ser reconocibles como acciones y funcionar sin depender únicamente del color.
 
 No se incorpora framework CSS ni biblioteca de iconos.
 
-Si se usan iconos, deben resolverse con recursos ya disponibles o elementos extremadamente simples; la ausencia de iconos no bloquea el MVP.
+No se requieren iconos para cerrar el MVP.
 
 ## 11. Responsive
 
@@ -402,7 +379,7 @@ Se mantiene aceptación aproximada en:
 Objetivos:
 
 - sin overflow horizontal;
-- tarjetas adaptables;
+- accesos prioritarios adaptables;
 - orden de lectura estable;
 - buscador utilizable;
 - “Empieza aquí” visible y comprensible;
@@ -419,7 +396,7 @@ Requisitos mínimos:
 - sección “Empieza aquí” identificable;
 - navegación por teclado completa;
 - foco visible;
-- tarjetas/enlaces con nombre accesible;
+- enlaces con nombre accesible;
 - no depender solo del color;
 - `CategoryFilter` conserva su navegación semántica;
 - el buscador conserva su label accesible actual.
@@ -462,8 +439,8 @@ Casos mínimos:
 2. “Empieza aquí” usa únicamente tipos prioritarios realmente disponibles;
 3. respeta el orden fijo de prioridad;
 4. omite un tipo prioritario ausente;
-5. cada tarjeta enlaza a `/buscar?type=<tipo>`;
-6. “Explora todo” sigue mostrando todos los tipos disponibles;
+5. cada acceso mantiene `/buscar?type=<tipo>`;
+6. “Explora todo” sigue mostrando todos los tipos conocidos disponibles;
 7. si no existen tipos prioritarios, no se muestra una sección vacía;
 8. navegación de teclado básica sobre los accesos;
 9. las pruebas existentes de búsqueda, detalle, Bootstrap y procedencia siguen verdes.
@@ -485,12 +462,12 @@ Además, con Knowledge real preparado:
 
 ```text
 abrir /
-→ ver “Empieza aquí”
-→ abrir Materiales
+→ ver “Empieza aquí” cuando exista al menos un tipo prioritario
+→ abrir Materiales si está realmente disponible
 → comprobar /buscar?type=material
 → abrir una ficha
 → volver
-→ abrir otra categoría prioritaria
+→ abrir otra categoría prioritaria disponible
 → comprobar “Explora todo”
 ```
 
@@ -517,19 +494,20 @@ MVP 2 se considera terminado únicamente si:
 
 1. `/` funciona como dashboard para principiante;
 2. el buscador del MVP 1 sigue operativo sin duplicación;
-3. “Empieza aquí” presenta únicamente tipos reales del bundle;
+3. “Empieza aquí” presenta únicamente tipos conocidos y reales del bundle;
 4. el orden prioritario es determinístico;
 5. cada acceso reutiliza `/buscar?type=...`;
-6. “Explora todo” conserva todos los tipos existentes;
-7. no se crea taxonomía paralela;
-8. no se inventa contenido destacado;
-9. no se añade backend, DB, auth, IA ni infraestructura;
-10. búsqueda, detalle, fuente y procedencia del MVP 1 no regresan;
-11. responsive 1440/768/390 pasa;
-12. accesibilidad smoke pasa;
-13. tests, typecheck y build pasan;
-14. Knowledge generado continúa fuera de Git;
-15. una aceptación manual con Knowledge real completa el flujo principal.
+6. “Explora todo” conserva todos los tipos conocidos existentes;
+7. ambas zonas reutilizan `CategoryFilter` en vez de duplicar la navegación;
+8. no se crea taxonomía paralela;
+9. no se inventa contenido destacado;
+10. no se añade backend, DB, auth, IA ni infraestructura;
+11. búsqueda, detalle, fuente y procedencia del MVP 1 no regresan;
+12. responsive 1440/768/390 pasa;
+13. accesibilidad smoke pasa;
+14. tests, typecheck y build pasan;
+15. Knowledge generado continúa fuera de Git;
+16. una aceptación manual con Knowledge real completa el flujo principal.
 
 ## 17. Archivos que probablemente cambien
 
@@ -541,11 +519,7 @@ src/styles/app.css
 tests/... dashboard/home focal test
 ```
 
-Posible, solo si mejora claridad:
-
-```text
-src/features/search/BeginnerStart.tsx
-```
+No se espera crear un nuevo componente para el dashboard.
 
 No se espera modificar:
 
@@ -558,7 +532,9 @@ src/app/routes.tsx
 package.json
 ```
 
-Si durante implementación alguno de estos últimos necesita cambiar, debe existir un defecto o requisito concreto que lo justifique antes de hacerlo.
+`CategoryFilter.tsx` tampoco debería necesitar cambio funcional; reutilizar dos instancias es suficiente salvo defecto demostrado.
+
+Si durante implementación alguno de estos archivos necesita cambiar, debe existir un defecto o requisito concreto que lo justifique antes de hacerlo.
 
 ## 18. Guardrail de alcance
 
