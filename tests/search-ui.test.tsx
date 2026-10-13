@@ -142,7 +142,7 @@ describe("Knowledge search UI", () => {
     });
     renderAt("/buscar?q=bisagras", [record]);
 
-    expect(screen.getByText("Herrajes")).toBeInTheDocument();
+    expect(screen.getAllByText("Herrajes").length).toBeGreaterThan(0);
     expect(screen.getByText("Explicación sencilla sobre bisagras de cazoleta.")).toBeInTheDocument();
     expect(screen.getByText(/Herrajes.*Instalación.*Página PDF 1/)).toBeInTheDocument();
 
