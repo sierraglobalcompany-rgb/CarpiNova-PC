@@ -4,9 +4,12 @@ on:
   push:
     branches:
       - design/knowledge-explorer-mvp1-20261012
+  pull_request:
+    branches:
+      - main
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   test:
@@ -16,20 +19,12 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: '22'
+          cache: npm
       - name: Install dependencies
-        run: npm install
-      - name: Security audit
-        run: npm audit --audit-level=moderate
+        run: npm ci
       - name: Test
         run: npm test
       - name: Typecheck
         run: npm run typecheck
       - name: Build
         run: npm run build
-      - name: Commit lockfile only
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add package-lock.json
-          git commit -m "chore: lock verified dependencies"
-          git push origin HEAD:design/knowledge-explorer-mvp1-20261012
