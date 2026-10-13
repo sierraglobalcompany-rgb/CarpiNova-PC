@@ -1,3 +1,5 @@
+import { Link } from "react-router-dom";
+
 import { getAvailableContentTypes } from "../../knowledge/contentTypes";
 import { useKnowledge } from "../../knowledge/KnowledgeContext";
 import { CategoryFilter } from "./CategoryFilter";
@@ -31,6 +33,19 @@ export function HomePage() {
         <section aria-labelledby="start-here-heading">
           <h2 id="start-here-heading">Empieza aquí</h2>
           <CategoryFilter types={startHereTypes} />
+        </section>
+      ) : null}
+
+      {repository.lessons.length > 0 ? (
+        <section aria-labelledby="guided-lessons-heading">
+          <h2 id="guided-lessons-heading">Aprende paso a paso</h2>
+          <ul className="guided-lessons">
+            {repository.lessons.map((lesson) => (
+              <li key={lesson.lesson_id}>
+                <Link to={`/lecciones/${lesson.lesson_id}`}>{lesson.title}</Link>
+              </li>
+            ))}
+          </ul>
         </section>
       ) : null}
 
