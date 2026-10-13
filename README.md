@@ -32,19 +32,11 @@ Con esa estructura no hace falta indicar la ruta de Knowledge manualmente.
 
 ## 1. Instalar dependencias
 
-El gate final reproducible del MVP usa:
+La resolución de dependencias está fijada en `package-lock.json`. Instala de forma reproducible con:
 
 ```bash
 npm ci
 ```
-
-Mientras `package-lock.json` no haya sido materializado y verificado en la aceptación Windows final de esta rama, el desarrollo/CI transitorio usa:
-
-```bash
-npm install
-```
-
-**No se debe declarar cerrado el MVP ni migrar CI a `npm ci` antes de que el lockfile real quede generado y comprometido.**
 
 ## 2. Preparar Knowledge 1.0.0
 
@@ -100,15 +92,10 @@ Después de corregir/preparar Knowledge basta recargar la página; el MVP no imp
 ## 4. Verificaciones automáticas
 
 ```bash
+npm ci
 npm test
 npm run typecheck
 npm run build
-```
-
-Cuando `package-lock.json` quede materializado, el gate limpio completo empieza con:
-
-```bash
-npm ci
 ```
 
 ## 5. Preview de producción
