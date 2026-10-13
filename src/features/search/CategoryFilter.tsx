@@ -15,9 +15,11 @@ function categoryHref(type: string, query: string) {
 export function CategoryFilter({
   types,
   query = "",
+  selectedType = null,
 }: {
   types: string[];
   query?: string;
+  selectedType?: string | null;
 }) {
   if (types.length === 0) {
     return null;
@@ -28,7 +30,12 @@ export function CategoryFilter({
       <ul>
         {types.map((type) => (
           <li key={type}>
-            <Link to={categoryHref(type, query)}>{getContentTypeLabel(type)}</Link>
+            <Link
+              to={categoryHref(type, query)}
+              aria-current={type === selectedType ? "page" : undefined}
+            >
+              {getContentTypeLabel(type)}
+            </Link>
           </li>
         ))}
       </ul>

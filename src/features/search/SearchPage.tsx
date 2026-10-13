@@ -28,19 +28,29 @@ export function SearchPage() {
     <section className="search-page">
       <h1>Buscar conocimiento</h1>
       <SearchForm initialQuery={query} />
-      <CategoryFilter types={availableTypes} query={query} />
+      <div className="search-page__layout">
+        <aside className="search-page__filters" aria-label="Filtros de búsqueda">
+          <CategoryFilter
+            types={availableTypes}
+            query={query}
+            selectedType={contentType}
+          />
+        </aside>
 
-      {!hasSearchIntent ? (
-        <p>Busca un término o elige una categoría.</p>
-      ) : hits.length === 0 ? (
-        <p>No encontramos resultados.</p>
-      ) : (
-        <div className="search-results" aria-label="Resultados de búsqueda">
-          {hits.map((hit) => (
-            <SearchResultCard key={hit.content.content_id} hit={hit} />
-          ))}
-        </div>
-      )}
+        <section className="search-page__results" aria-live="polite">
+          {!hasSearchIntent ? (
+            <p>Busca un término o elige una categoría.</p>
+          ) : hits.length === 0 ? (
+            <p>No encontramos resultados.</p>
+          ) : (
+            <div className="search-results" aria-label="Resultados de búsqueda">
+              {hits.map((hit) => (
+                <SearchResultCard key={hit.content.content_id} hit={hit} />
+              ))}
+            </div>
+          )}
+        </section>
+      </div>
     </section>
   );
 }
