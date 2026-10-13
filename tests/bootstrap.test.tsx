@@ -37,6 +37,13 @@ function validRepository(): KnowledgeRepository {
       rules: [],
       taxonomy: {},
     },
+    {
+      schema_version: "0.1.0",
+      knowledge_version: "1.0.0",
+      book_id: "cpnc-2025",
+      scope: "BOOK",
+      lessons: [],
+    },
   );
 }
 
@@ -113,9 +120,18 @@ describe("Bootstrap", () => {
       rules: [],
       taxonomy: {},
     };
+    const lessons = {
+      schema_version: "0.1.0",
+      knowledge_version: "0.9.0",
+      book_id: "cpnc-2025",
+      scope: "BOOK",
+      lessons: [],
+    };
     const fetchImpl = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
-      return jsonResponse(url.endsWith("manifest.json") ? staleManifest : bundle);
+      if (url.endsWith("manifest.json")) return jsonResponse(staleManifest);
+      if (url.endsWith("lessons.bundle.json")) return jsonResponse(lessons);
+      return jsonResponse(bundle);
     }) as unknown as typeof fetch;
     const load = () => loadKnowledge(fetchImpl);
 

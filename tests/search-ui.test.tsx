@@ -8,6 +8,7 @@ import { KnowledgeProvider } from "../src/knowledge/KnowledgeContext";
 import type {
   ContentRecord,
   KnowledgeRepository,
+  LessonRecord,
   PageRecord,
   SourceRecord,
 } from "../src/knowledge/types";
@@ -51,7 +52,19 @@ function content(
   };
 }
 
-function repository(records: ContentRecord[]): KnowledgeRepository {
+function guidedLesson(): LessonRecord {
+  return {
+    lesson_id: "LESSON-SLIDES-X-2X-PILOT",
+    title: "Calcular e instalar correderas con X y 2X",
+    source_content_ids: [],
+    steps: [],
+  };
+}
+
+function repository(
+  records: ContentRecord[],
+  lessons: LessonRecord[] = [],
+): KnowledgeRepository {
   return {
     manifest: {
       schema_version: "0.1.0",
@@ -77,6 +90,8 @@ function repository(records: ContentRecord[]): KnowledgeRepository {
     },
     pagesById: new Map([[PAGE_ID, page]]),
     contentById: new Map(records.map((record) => [record.content_id, record])),
+    lessons,
+    lessonsById: new Map(lessons.map((lesson) => [lesson.lesson_id, lesson])),
   };
 }
 
@@ -85,9 +100,13 @@ function LocationProbe() {
   return <output data-testid="location">{location.pathname}{location.search}</output>;
 }
 
-function renderAt(initialEntry: string, records: ContentRecord[]) {
+function renderAt(
+  initialEntry: string,
+  records: ContentRecord[],
+  lessons: LessonRecord[] = [],
+) {
   return render(
-    <KnowledgeProvider repository={repository(records)}>
+    <KnowledgeProvider repository={repository(records, lessons)}>
       <MemoryRouter initialEntries={[initialEntry]}>
         <AppRoutes />
         <LocationProbe />
@@ -141,6 +160,23 @@ describe("Knowledge search UI", () => {
     await user.click(screen.getByRole("button", { name: "Buscar" }));
 
     expect(screen.getByTestId("location")).toHaveTextContent("/buscar?q=bisagras");
+  });
+
+  it("surfaces canonical guided lessons only from the repository", () => {
+    const lesson = guidedLesson();
+    renderAt("/", [content("020")], [lesson]);
+
+    const guided = screen.getByRole("region", { name: "Aprende paso a paso" });
+    const link = within(guided).getByRole("link", { name: lesson.title });
+    expect(link).toHaveAttribute("href", `/lecciones/${lesson.lesson_id}`);
+  });
+
+  it("omits guided lessons when the repository has none", () => {
+    renderAt("/", [content("021")]);
+
+    expect(
+      screen.queryByRole("region", { name: "Aprende paso a paso" }),
+    ).not.toBeInTheDocument();
   });
 
   it("omits Empieza aquí when no priority type is available", () => {

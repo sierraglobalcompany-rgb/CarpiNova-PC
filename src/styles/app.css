@@ -201,6 +201,26 @@ p {
   margin-top: 2.5rem;
 }
 
+.guided-lessons {
+  display: grid;
+  gap: 0.75rem;
+  max-width: 900px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.guided-lessons a {
+  display: block;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  padding: 0.9rem 1rem;
+  text-decoration: none;
+  font-weight: 750;
+}
+
 .search-page__layout {
   display: grid;
   grid-template-columns: minmax(180px, 240px) minmax(0, 1fr);
@@ -263,11 +283,13 @@ p {
   font-weight: 750;
 }
 
-.content-page {
+.content-page,
+.lesson-page {
   max-width: 820px;
 }
 
-.content-page > a {
+.content-page > a,
+.lesson-page > a {
   display: inline-flex;
   margin-bottom: 1.5rem;
   font-weight: 700;
@@ -318,6 +340,41 @@ p {
   margin: 0;
 }
 
+.lesson-page__steps {
+  display: grid;
+  gap: 1rem;
+  margin: 1.5rem 0 0;
+  padding-left: 1.4rem;
+}
+
+.lesson-page__steps > li::marker {
+  color: var(--accent-strong);
+  font-weight: 800;
+}
+
+.lesson-page__steps > li > section {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  padding: 1.25rem 1.35rem;
+}
+
+.lesson-page__steps h2 {
+  margin-top: 0;
+}
+
+.lesson-page__content + .lesson-page__content {
+  margin-top: 0.9rem;
+  border-top: 1px solid var(--border);
+  padding-top: 0.9rem;
+}
+
+.lesson-page__content a {
+  display: inline-flex;
+  font-weight: 750;
+}
+
 @media (max-width: 720px) {
   .app-header {
     padding-inline: 1rem;
@@ -362,8 +419,13 @@ p {
 
   .content-page__primary,
   .content-page__source,
-  .search-result-card {
+  .search-result-card,
+  .lesson-page__steps > li > section {
     padding: 1rem;
+  }
+
+  .lesson-page__steps {
+    padding-left: 1.2rem;
   }
 
   .content-page__source dl > div {

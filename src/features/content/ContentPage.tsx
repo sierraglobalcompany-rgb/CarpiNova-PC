@@ -9,11 +9,13 @@ export function ContentPage() {
   const repository = useKnowledge();
   const content = contentId ? repository.contentById.get(contentId) : undefined;
   const returnTo = (location.state as { returnTo?: unknown } | null)?.returnTo;
-  const resultsPath =
+  const isLessonReturn =
+    typeof returnTo === "string" && /^\/lecciones\/[^/?#]+$/.test(returnTo);
+  const isSearchReturn =
     typeof returnTo === "string" &&
-    (returnTo === "/buscar" || returnTo.startsWith("/buscar?"))
-      ? returnTo
-      : "/buscar";
+    (returnTo === "/buscar" || returnTo.startsWith("/buscar?"));
+  const returnPath = isLessonReturn || isSearchReturn ? returnTo : "/buscar";
+  const returnLabel = isLessonReturn ? "Volver a la lección" : "Volver a resultados";
 
   if (!content) {
     return (
@@ -30,7 +32,7 @@ export function ContentPage() {
 
   return (
     <article className="content-page">
-      <Link to={resultsPath}>Volver a resultados</Link>
+      <Link to={returnPath}>{returnLabel}</Link>
 
       <section className="content-page__primary">
         <h1>{primary.label}</h1>
