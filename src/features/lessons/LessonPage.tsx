@@ -24,7 +24,7 @@ export function LessonPage() {
       <Link to="/">Volver al inicio</Link>
       <h1>{lesson.title}</h1>
 
-      <ol className="lesson-page__steps">
+      <ol className="lesson-page__steps" aria-label="Pasos de la lección">
         {lesson.steps.map((step) => (
           <li key={step.order}>
             <section>
