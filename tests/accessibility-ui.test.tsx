@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import { describe, expect, it } from "vitest";
@@ -112,7 +112,9 @@ describe("accessible workshop UI", () => {
     renderAt("/buscar?q=bisagras&type=hardware");
 
     expect(screen.getAllByRole("main")).toHaveLength(1);
-    expect(screen.getByRole("searchbox", { name: /buscar en carpinova/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole("searchbox", { name: /buscar en carpinova/i }),
+    ).toBeInTheDocument();
 
     const selectedCategory = screen.getByRole("link", { name: "Herrajes" });
     expect(selectedCategory).toHaveAttribute("aria-current", "page");
@@ -132,6 +134,39 @@ describe("accessible workshop UI", () => {
     await user.keyboard("{Enter}");
 
     expect(screen.getByTestId("location")).toHaveTextContent("/buscar?q=MDF");
+  });
+
+  it("reaches and activates beginner dashboard links with the keyboard", async () => {
+    const user = userEvent.setup();
+    renderAt("/");
+
+    const startHere = screen.getByRole("region", { name: "Empieza aquí" });
+    expect(
+      screen.getByRole("region", { name: "Explora todo" }),
+    ).toBeInTheDocument();
+
+    const materialLink = within(startHere).getByRole("link", {
+      name: "Materiales",
+    });
+    const hardwareLink = within(startHere).getByRole("link", {
+      name: "Herrajes",
+    });
+
+    await user.tab();
+    expect(
+      screen.getByRole("searchbox", { name: /buscar en carpinova/i }),
+    ).toHaveFocus();
+    await user.tab();
+    expect(screen.getByRole("button", { name: "Buscar" })).toHaveFocus();
+    await user.tab();
+    expect(materialLink).toHaveFocus();
+    await user.tab();
+    expect(hardwareLink).toHaveFocus();
+
+    await user.keyboard("{Enter}");
+    expect(screen.getByTestId("location")).toHaveTextContent(
+      "/buscar?type=hardware",
+    );
   });
 
   it("keeps source provenance in a native disclosure", () => {
