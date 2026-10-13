@@ -33,8 +33,7 @@ function searchableFields(content: ContentRecord): string[] {
     ...(content.tags ?? []),
     content.content_type,
   ]
-    .map(normalizeSearchText)
-    .filter(Boolean);
+    .map(normalizeSearchText);
 }
 
 function tokenSet(fields: string[]): Set<string> {
@@ -45,9 +44,7 @@ function hasWholePhrase(field: string, query: string): boolean {
   return ` ${field} `.includes(` ${query} `);
 }
 
-function rankContent(content: ContentRecord, query: string): 1 | 2 | 3 | null {
-  const fields = searchableFields(content);
-
+function rankFields(fields: string[], query: string): 1 | 2 | 3 | null {
   if (fields.some((field) => hasWholePhrase(field, query))) {
     return 3;
   }
@@ -85,7 +82,7 @@ export function searchKnowledge(
     return [];
   }
 
-  const hits: KnowledgeHit[] = [];
+  const hits: Array<{ hit: KnowledgeHit; fieldPriority: number }> = [];
 
   for (const content of repository.bundle.content) {
     if (knownType && content.content_type !== knownType) {
@@ -98,18 +95,26 @@ export function searchKnowledge(
     }
 
     if (!query) {
-      hits.push({ content, page, rank: 1 });
+      hits.push({ hit: { content, page, rank: 1 }, fieldPriority: 0 });
       continue;
     }
 
-    const rank = rankContent(content, query);
+    const fields = searchableFields(content);
+    const rank = rankFields(fields, query);
     if (rank !== null) {
-      hits.push({ content, page, rank });
+      const exactMatchField = fields.findIndex((field) => hasWholePhrase(field, query));
+      hits.push({
+        hit: { content, page, rank },
+        fieldPriority: exactMatchField === -1 ? fields.length : exactMatchField,
+      });
     }
   }
 
-  return hits.sort((left, right) =>
-    right.rank - left.rank ||
-    left.content.content_id.localeCompare(right.content.content_id),
-  );
+  return hits
+    .sort((left, right) =>
+      right.hit.rank - left.hit.rank ||
+      left.fieldPriority - right.fieldPriority ||
+      left.hit.content.content_id.localeCompare(right.hit.content.content_id),
+    )
+    .map(({ hit }) => hit);
 }

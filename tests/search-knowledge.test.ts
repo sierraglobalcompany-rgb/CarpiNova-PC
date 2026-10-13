@@ -132,6 +132,28 @@ describe("deterministic Knowledge search", () => {
     ]);
   });
 
+  it("prioritizes visible text matches over normalized text and tag matches", () => {
+    const repo = repository([
+      content("001", {
+        learning_text: "Información general del módulo",
+        tags: ["bisagras"],
+      }),
+      content("002", {
+        learning_text: "Descripción del herraje",
+        normalized_text: "Bisagras de cazoleta",
+      }),
+      content("003", { learning_text: "Bisagras de cazoleta" }),
+    ]);
+
+    const hits = searchKnowledge(repo, { query: "bisagras" });
+
+    expect(hits.map((hit) => hit.content.content_id)).toEqual([
+      "CONTENT-CPNC-2025-P0001-003",
+      "CONTENT-CPNC-2025-P0001-002",
+      "CONTENT-CPNC-2025-P0001-001",
+    ]);
+  });
+
   it("does not index source_transcription and tolerates missing tags", () => {
     const repo = repository([
       content("001", {
