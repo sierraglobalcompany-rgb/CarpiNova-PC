@@ -15,6 +15,7 @@ import type {
 
 const PAGE_ID = "PAGE-CPNC-2025-P0001";
 const CONTENT_ID = "CONTENT-CPNC-2025-P0001-001";
+const LESSON_ID = "LESSON-SLIDES-X-2X-PILOT";
 const SOURCE_SHA = "318ceb94569608bfe062e3e50c7032edee79febf06102f7eec760769a6dfd90c";
 
 const source: SourceRecord = {
@@ -105,6 +106,23 @@ function renderAt(path: string, repo = repository()) {
   );
 }
 
+function renderWithReturnTo(returnTo: unknown, repo = repository()) {
+  return render(
+    <KnowledgeProvider repository={repo}>
+      <MemoryRouter
+        initialEntries={[
+          {
+            pathname: `/contenido/${CONTENT_ID}`,
+            state: { returnTo },
+          },
+        ]}
+      >
+        <AppRoutes />
+      </MemoryRouter>
+    </KnowledgeProvider>,
+  );
+}
+
 describe("content presentation", () => {
   it("uses the approved primary-text fallback order without synthesizing prose", () => {
     expect(selectPrimaryText(content())).toEqual({
@@ -143,6 +161,31 @@ describe("content presentation", () => {
     expect(screen.getByText("Instalación")).toBeInTheDocument();
     expect(screen.getByText("Método").parentElement).toHaveTextContent("Métodovisual");
     expect(screen.getByText("Estado").parentElement).toHaveTextContent("EstadoVALIDATED");
+  });
+
+  it("returns safely to the lesson that opened the canonical content", () => {
+    const lessonPath = `/lecciones/${LESSON_ID}`;
+    renderWithReturnTo(lessonPath);
+
+    expect(screen.getByRole("link", { name: "Volver a la lección" })).toHaveAttribute(
+      "href",
+      lessonPath,
+    );
+  });
+
+  it.each([
+    "https://example.com",
+    "//example.com",
+    "/lecciones/foo/bar",
+    "/lecciones/foo?next=https://example.com",
+  ])("rejects manipulated return target %s", (returnTo) => {
+    renderWithReturnTo(returnTo);
+
+    expect(screen.getByRole("link", { name: "Volver a resultados" })).toHaveAttribute(
+      "href",
+      "/buscar",
+    );
+    expect(screen.queryByRole("link", { name: "Volver a la lección" })).not.toBeInTheDocument();
   });
 
   it("omits null printed-page output and handles an unknown content id clearly", () => {
