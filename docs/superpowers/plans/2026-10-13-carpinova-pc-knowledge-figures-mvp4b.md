@@ -30,7 +30,7 @@
 
 ## Review Focus
 
-1. **Version drift:** `1.1.0` support must not accidentally allow `1.2.0` or weaken book/scope/source/hash checks. Task 1 and Task 2 pin this with explicit allowlist and negative tests.
+1. **Version drift:** `1.1.0` support must not accidentally allow `1.2.0` or weaken book/scope/source/hash checks. Task 1 and Task 2 pin this with explicit allowlists and negative tests.
 2. **Legacy vs render-ready boundary:** a legacy figure missing camera/layers must load, while an opted-in malformed `normalized-2d-v1` must fail. Task 2 and Task 3 pin both sides.
 3. **Reference integrity/order:** duplicate or missing figure IDs and repeated lesson references must never create ambiguous indexes, repeated diagrams, or empty support UI. Task 2 and Task 5 test these cases.
 4. **SVG safety/accessibility:** annotation text must be React-escaped, painter order stable, and accessible naming must use `summary` then canonical `purpose`. Task 4 pins these behaviors.
@@ -42,34 +42,32 @@
 
 ### Existing files to modify
 
-- `scripts/prepare-knowledge.mjs` — explicit dual-version preparation allowlist; keep existing hash and atomic-install behavior.
-- `src/app/Bootstrap.tsx` — make the failure copy version-neutral.
-- `src/knowledge/types.ts` — add minimal figure consumer types, supported-version type, and `figures` / `figuresById` repository fields.
-- `src/knowledge/loadKnowledge.ts` — accept supported manifest versions, fetch/validate figures, build figure index, validate cross-references and render-contract safety.
-- `src/features/lessons/LessonPage.tsx` — deduplicate renderable figures and place support figures before lesson steps.
-- `src/styles/app.css` — minimal responsive support-figure/SVG presentation using existing design tokens.
-- `tests/prepare-knowledge.test.ts` — preparation version allowlist and invariant regression.
-- `tests/bootstrap.test.tsx` — neutral actionable error copy and updated repository fixture signature.
+- `scripts/prepare-knowledge.mjs` — explicit dual-version preparation allowlist; preserve hash and atomic-install behavior.
+- `src/app/Bootstrap.tsx` — version-neutral failure copy.
+- `src/knowledge/types.ts` — minimal figure consumer types, supported-version type, `figures` / `figuresById`.
+- `src/knowledge/loadKnowledge.ts` — dual-version runtime boundary; fetch/validate figures; indexes and cross-references.
+- `src/features/lessons/LessonPage.tsx` — first-seen figure dedupe and support-figure placement.
+- `src/styles/app.css` — minimal responsive figure styling using existing tokens.
+- `tests/prepare-knowledge.test.ts` — preparation allowlist and invariant regression.
+- `tests/bootstrap.test.tsx` — neutral error copy and later builder-fixture compatibility.
 - `tests/knowledge-loader.test.ts` — runtime version/bundle/index/reference boundary.
-- `tests/lesson-page.test.tsx` — one-time figure presentation, order, and existing navigation regression.
-- `tests/lesson-accessibility.test.tsx` — updated builder fixture and lesson accessibility regression.
-- `tests/accessibility-ui.test.tsx` — add empty figure repository fields to direct fixture.
-- `tests/content-page.test.tsx` — add empty figure repository fields to direct fixture.
-- `tests/search-ui.test.tsx` — add empty figure repository fields to direct fixture.
+- `tests/lesson-page.test.tsx` — one-time figure presentation and navigation regression.
+- `tests/lesson-accessibility.test.tsx` — accessible lesson figure and existing keyboard/link regression.
+- `tests/accessibility-ui.test.tsx`, `tests/content-page.test.tsx`, `tests/search-ui.test.tsx` — direct repository fixture compatibility only.
 
 ### New focused files
 
 - `src/features/figures/FigureDiagram.tsx` — native React/SVG renderer for validated `normalized-2d-v1` only.
-- `tests/figure-contract.test.ts` — focused malformed/legacy `normalized-2d-v1` loader tests.
-- `tests/figure-diagram.test.tsx` — focused renderer ordering, primitives, safety, and accessibility tests.
-- `docs/verification/knowledge-figures-mvp4b-local.md` — real 1.0.0 and 1.1.0 compatibility evidence.
-- `docs/checkpoints/2026-10-13-knowledge-figures-mvp4b-candidate.md` — final MVP4B candidate checkpoint.
+- `tests/figure-contract.test.ts` — render-contract boundary tests.
+- `tests/figure-diagram.test.tsx` — renderer primitives/order/safety/accessibility.
+- `docs/verification/knowledge-figures-mvp4b-local.md` — real 1.0.0/1.1.0 compatibility evidence.
+- `docs/checkpoints/2026-10-13-knowledge-figures-mvp4b-candidate.md` — final candidate checkpoint.
 
 No permanent workflow or dependency file should change.
 
 ---
 
-### Task 1: Dual-version preparation boundary and neutral bootstrap copy
+### Task 1: Dual-version preparation boundary and neutral Bootstrap copy
 
 **Files:**
 - Modify: `scripts/prepare-knowledge.mjs`
@@ -78,17 +76,17 @@ No permanent workflow or dependency file should change.
 - Modify: `tests/bootstrap.test.tsx`
 
 **Interfaces:**
-- Produces: preparation allowlist containing exactly `"1.0.0"` and `"1.1.0"`.
-- Preserves: `validateManifest(manifest)`, `verifyArtifactHashes(bundleDir, manifest)`, and `prepareKnowledge(...)` public entry points.
-- Produces UI copy: `No se pudo cargar CarpiNova Knowledge. Ejecuta la preparación del conocimiento y vuelve a intentar.`
+- Produces an explicit preparation allowlist containing only `"1.0.0"` and `"1.1.0"`.
+- Preserves `validateManifest(manifest)`, `verifyArtifactHashes(bundleDir, manifest)`, and `prepareKnowledge(...)`.
+- Produces exact UI copy: `No se pudo cargar CarpiNova Knowledge. Ejecuta la preparación del conocimiento y vuelve a intentar.`
 
 - [ ] **Step 1: Open the implementation PR as draft before product mutation**
 
-Create a draft PR from `design/knowledge-figures-mvp4b-20261013` to `main` titled `feat: MVP4B Knowledge figures compatibility`. Keep it draft throughout the plan unless a later explicit user decision says otherwise.
+Create a draft PR from `design/knowledge-figures-mvp4b-20261013` to `main` titled `feat: MVP4B Knowledge figures compatibility`. Keep it draft throughout this plan unless a later explicit user decision says otherwise.
 
 - [ ] **Step 2: Write RED preparation tests**
 
-In `tests/prepare-knowledge.test.ts`, replace the single-version assertion with tests that prove:
+In `tests/prepare-knowledge.test.ts`, make the manifest helper accept field overrides and prove:
 
 ```ts
 expect(() => validateManifest(manifest({ knowledge_version: "1.0.0" }))).not.toThrow();
@@ -96,25 +94,15 @@ expect(() => validateManifest(manifest({ knowledge_version: "1.1.0" }))).not.toT
 expect(() => validateManifest(manifest({ knowledge_version: "1.2.0" }))).toThrow("knowledge_version");
 ```
 
-Keep explicit negative assertions for wrong `book_id`, `scope`, source SHA, missing artifact hashes, wrong artifact hashes, and missing artifacts.
+Keep explicit negative assertions for wrong `book_id`, `scope`, source SHA, missing artifact hashes, wrong hashes, and missing artifacts.
 
-Adjust the fixture helper to accept overrides without weakening those invariants.
+- [ ] **Step 3: Write RED Bootstrap-copy test**
 
-- [ ] **Step 3: Write RED bootstrap-copy test**
+In `tests/bootstrap.test.tsx`, require the exact neutral copy and assert `Knowledge 1.0.0` is absent from the error state.
 
-In `tests/bootstrap.test.tsx`, set the expected copy exactly to:
+Task 2 owns the later four-argument repository fixture update; do not pre-implement it here.
 
-```text
-No se pudo cargar CarpiNova Knowledge. Ejecuta la preparación del conocimiento y vuelve a intentar.
-```
-
-Assert the old substring `Knowledge 1.0.0` is absent from the error state.
-
-When the builder signature later changes, Task 2 will add the figures argument; do not pre-implement that here.
-
-- [ ] **Step 4: Run the Task 1 RED tests**
-
-Run:
+- [ ] **Step 4: Run Task 1 RED**
 
 ```bash
 npm test -- tests/prepare-knowledge.test.ts tests/bootstrap.test.tsx
@@ -124,23 +112,21 @@ Expected: FAIL only because preparation still rejects `1.1.0` and Bootstrap stil
 
 - [ ] **Step 5: Implement the preparation allowlist minimally**
 
-In `scripts/prepare-knowledge.mjs` define an explicit value such as:
+In `scripts/prepare-knowledge.mjs`, define an explicit supported-version collection such as:
 
 ```js
 export const SUPPORTED_KNOWLEDGE_VERSIONS = new Set(["1.0.0", "1.1.0"]);
 ```
 
-`validateManifest(manifest)` must check membership, then continue enforcing exact book/scope/source SHA and artifact hashes exactly as before. Do not use semver ranges.
+`validateManifest(manifest)` checks membership and then preserves exact book/scope/source SHA and artifact-hash requirements. No semver package or range.
 
-Remove any CLI success text that falsely claims a single expected version; success output may be version-neutral.
+Make CLI success text version-neutral instead of claiming a single expected version.
 
 - [ ] **Step 6: Make Bootstrap copy version-neutral**
 
-Keep the existing fail-closed UI state and change only `KNOWLEDGE_LOAD_ERROR` to the exact approved neutral text.
+Change only `KNOWLEDGE_LOAD_ERROR` to the approved text; preserve loading/error/ready behavior.
 
-- [ ] **Step 7: Run focal GREEN tests**
-
-Run:
+- [ ] **Step 7: Run focal GREEN**
 
 ```bash
 npm test -- tests/prepare-knowledge.test.ts tests/bootstrap.test.tsx
@@ -150,17 +136,15 @@ Expected: PASS.
 
 - [ ] **Step 8: Run Task 1 regression checks**
 
-Run:
-
 ```bash
 npm test
 npm run typecheck
 npm run build
 ```
 
-Expected: PASS with the same application behavior except the approved version compatibility at prepare boundary and neutral error copy.
+Expected: PASS.
 
-- [ ] **Step 9: Commit Task 1**
+- [ ] **Step 9: Commit Task 1 explicitly**
 
 ```bash
 git add scripts/prepare-knowledge.mjs src/app/Bootstrap.tsx tests/prepare-knowledge.test.ts tests/bootstrap.test.tsx
@@ -169,7 +153,7 @@ git commit -m "feat: accept supported Knowledge versions"
 
 - [ ] **Step 10: CI/checkpoint gate and STOP**
 
-Require exact-HEAD CI success. Record version tests, hash/source invariants, and draft PR state. STOP; do not start Task 2 until the next `continua`.
+Require exact-HEAD CI success. Record version tests, source/hash invariants, and draft PR state. STOP.
 
 ---
 
@@ -182,8 +166,8 @@ Require exact-HEAD CI success. Record version tests, hash/source invariants, and
 - Modify fixture-only compatibility in: `tests/bootstrap.test.tsx`, `tests/lesson-accessibility.test.tsx`, `tests/lesson-page.test.tsx`, `tests/accessibility-ui.test.tsx`, `tests/content-page.test.tsx`, `tests/search-ui.test.tsx`
 
 **Interfaces:**
-- Produces: `SupportedKnowledgeVersion = "1.0.0" | "1.1.0"`.
-- Produces minimal types: `FigureBundle`, `FigureRecord`, `FigureEntity`, `FigureGeometry`, `FigureAnnotation`, `FigurePlacement`, `FigureLayer`, `FigureCamera`, `FigureReconstruction`, `FigurePoint`, `FigureBounds`.
+- Produces `SupportedKnowledgeVersion = "1.0.0" | "1.1.0"`.
+- Produces minimal types `FigurePrimitive`, `FigureBundle`, `FigureRecord`, `FigureEntity`, `FigureGeometry`, `FigureAnnotation`, `FigurePlacement`, `FigureLayer`, `FigureCamera`, `FigureReconstruction`, `FigurePoint`, `FigureBounds`.
 - Changes builder signature to:
 
 ```ts
@@ -195,33 +179,27 @@ buildKnowledgeRepository(
 ): KnowledgeRepository
 ```
 
-- Produces repository fields:
+- Produces repository fields `figures: FigureRecord[]` and `figuresById: Map<string, FigureRecord>`.
+- Produces runtime fetch order with `/figures.bundle.json` before `/lessons.bundle.json`.
 
-```ts
-figures: FigureRecord[];
-figuresById: Map<string, FigureRecord>;
-```
+- [ ] **Step 1: Write RED loader fixtures for versions and figures**
 
-- Produces runtime fetch order containing `/figures.bundle.json` before `/lessons.bundle.json`.
+Extend `tests/knowledge-loader.test.ts` with `figure(...)` and `figuresBundle(...)`. The generic legacy figure has canonical identity fields but no `render_contract`, camera, or layers.
 
-- [ ] **Step 1: Write RED loader fixtures for dual versions and figures**
-
-Extend `tests/knowledge-loader.test.ts` with `figure(...)` and `figuresBundle(...)` fixture helpers. The generic legacy fixture must include canonical minimum identity fields but no `render_contract`.
-
-Add assertions proving:
+Assert:
 
 ```text
-1.0.0 manifest accepted
-1.1.0 manifest accepted
+1.0.0 accepted
+1.1.0 accepted
 1.2.0 rejected
 figures bundle fetched
-repository.figures contains record
+repository.figures contains figure
 repository.figuresById resolves figure_id
 ```
 
-- [ ] **Step 2: Write RED bundle identity/integrity tests**
+- [ ] **Step 2: Write RED bundle/reference tests**
 
-Add focused tests that reject:
+Reject:
 
 ```text
 figures not array
@@ -233,31 +211,28 @@ figure page_id missing from pagesById
 lesson figure_id missing from figuresById
 ```
 
-Also add a positive test that a legacy figure without `render_contract`, camera, or layers loads successfully.
+Also prove a legacy figure without render contract/camera/layers loads.
 
-- [ ] **Step 3: Write RED fetch failure tests**
+- [ ] **Step 3: Write RED fetch-failure tests**
 
-Update runtime fetch tests so missing or invalid JSON in `figures.bundle.json` rejects with a message naming that artifact, just as lessons currently do.
+Missing or invalid JSON in `figures.bundle.json` must reject with the artifact named in the error.
 
 - [ ] **Step 4: Run Task 2 RED**
-
-Run:
 
 ```bash
 npm test -- tests/knowledge-loader.test.ts
 npm run typecheck
 ```
 
-Expected: tests/typecheck fail because figure types, fourth builder argument, figure fetch, and indexes do not yet exist.
+Expected: FAIL because figure types, fourth builder argument, fetch, and indexes do not exist.
 
-- [ ] **Step 5: Add minimal consumer figure types**
+- [ ] **Step 5: Add the minimal consumer types**
 
-In `src/knowledge/types.ts` add only fields consumed by validation/rendering. Use permissive optional geometry members for legacy compatibility rather than duplicating the Knowledge JSON Schema.
-
-Required shape decisions:
+In `src/knowledge/types.ts` use exactly these decisions:
 
 ```ts
 export type SupportedKnowledgeVersion = "1.0.0" | "1.1.0";
+export type FigurePrimitive = "rect" | "line" | "polyline";
 
 export interface FigurePoint { x: number; y: number }
 export interface FigureBounds { x: number; y: number; width: number; height: number }
@@ -308,36 +283,34 @@ export interface FigureBundle {
 }
 ```
 
-Change `KnowledgeManifest.knowledge_version` to `SupportedKnowledgeVersion` and extend `KnowledgeRepository` with `figures` and `figuresById`.
+`FigurePrimitive` is the renderer allowlist; raw parsed geometry stays `string | null` until Task 3 validation narrows it. Change `KnowledgeManifest.knowledge_version` to `SupportedKnowledgeVersion` and extend `KnowledgeRepository` with `figures` / `figuresById`.
 
-- [ ] **Step 6: Extend runtime manifest validation without weakening invariants**
+- [ ] **Step 6: Extend runtime manifest validation**
 
-In `src/knowledge/loadKnowledge.ts`, use an explicit set of supported versions. Keep exact `book_id`, `scope`, source SHA and file-hash shape checks.
-
-Do not import or add a semver package.
+Use an explicit runtime version allowlist. Preserve exact book/scope/source SHA and file-hash-shape checks. No semver dependency.
 
 - [ ] **Step 7: Implement generic figure-bundle parsing/indexing**
 
-Add internal validation functions that:
+Internal validation must:
 
 ```text
-validate optional bundle identity fields against manifest
+validate optional bundle identity against manifest
 require figures array
-parse canonical consumer fields
+parse consumer fields
 require non-empty unique figure_id
 require page_id to resolve
 build figuresById
 ```
 
-At this task, legacy figures remain accepted even when camera/layers are absent.
+Legacy figures remain accepted without camera/layers.
 
 - [ ] **Step 8: Add lesson → figure cross-reference validation**
 
-Pass `figuresById` into lesson validation. Every `step.figure_ids` value must resolve; no inference or synthetic record is allowed.
+Pass `figuresById` into lesson validation. Every `step.figure_ids` value must resolve. Do not synthesize figures.
 
-- [ ] **Step 9: Fetch `figures.bundle.json` in `loadKnowledge()`**
+- [ ] **Step 9: Fetch the fourth runtime artifact**
 
-Fetch exactly:
+`loadKnowledge()` fetches exactly:
 
 ```text
 manifest.json
@@ -346,24 +319,22 @@ figures.bundle.json
 lessons.bundle.json
 ```
 
-Call the four-argument `buildKnowledgeRepository(...)` in that order.
+Then calls the four-argument builder in that order.
 
-- [ ] **Step 10: Repair only test fixtures affected by the explicit repository contract**
+- [ ] **Step 10: Repair only affected fixtures**
 
-Update all builder calls listed under Files to pass an empty/fixture figures bundle as the third argument.
+All builder calls listed under Files receive an empty/fixture figures bundle as argument three.
 
-For direct `KnowledgeRepository` object fixtures in `accessibility-ui.test.tsx`, `content-page.test.tsx`, and `search-ui.test.tsx`, add:
+Direct `KnowledgeRepository` fixtures in `accessibility-ui.test.tsx`, `content-page.test.tsx`, and `search-ui.test.tsx` gain only:
 
 ```ts
 figures: [],
 figuresById: new Map(),
 ```
 
-Do not refactor unrelated fixture structure.
+No unrelated fixture refactor.
 
 - [ ] **Step 11: Run focal GREEN and typecheck**
-
-Run:
 
 ```bash
 npm test -- tests/knowledge-loader.test.ts tests/bootstrap.test.tsx tests/lesson-page.test.tsx tests/lesson-accessibility.test.tsx tests/accessibility-ui.test.tsx tests/content-page.test.tsx tests/search-ui.test.tsx
@@ -374,8 +345,6 @@ Expected: PASS.
 
 - [ ] **Step 12: Run full Task 2 regression**
 
-Run:
-
 ```bash
 npm test
 npm run build
@@ -383,19 +352,16 @@ npm run build
 
 Expected: PASS.
 
-- [ ] **Step 13: Commit Task 2**
-
-Commit only the loader/types and fixture changes:
+- [ ] **Step 13: Commit Task 2 explicitly**
 
 ```bash
-git commit -am "feat: load Knowledge figure bundles"
+git add src/knowledge/types.ts src/knowledge/loadKnowledge.ts tests/knowledge-loader.test.ts tests/bootstrap.test.tsx tests/lesson-accessibility.test.tsx tests/lesson-page.test.tsx tests/accessibility-ui.test.tsx tests/content-page.test.tsx tests/search-ui.test.tsx
+git commit -m "feat: load Knowledge figure bundles"
 ```
-
-If a new file was unexpectedly needed, STOP and justify it before including it.
 
 - [ ] **Step 14: CI/checkpoint gate and STOP**
 
-Require exact-HEAD CI success. Record supported versions, figure counts in fixtures, cross-reference behavior, and unchanged dependency/workflow files. STOP.
+Require exact-HEAD CI success. Record supported versions, cross-reference behavior, and unchanged dependency/workflow files. STOP.
 
 ---
 
@@ -406,13 +372,13 @@ Require exact-HEAD CI success. Record supported versions, figure counts in fixtu
 - Create: `tests/figure-contract.test.ts`
 
 **Interfaces:**
-- Consumes: `FigureRecord` / `FigureLayer` / geometry types and four-argument builder from Task 2.
-- Produces internal validator behavior: legacy figures pass untouched; `normalized-2d-v1` figures are guaranteed safe for `FigureDiagram`.
-- No new public service or repository type.
+- Consumes Task 2 figure types and four-argument builder.
+- Produces the invariant that a record with `render_contract = normalized-2d-v1` is safe for `FigureDiagram`.
+- Legacy/non-supported contracts remain valid but non-renderable.
 
-- [ ] **Step 1: Write a reusable render-ready figure fixture in the new test file**
+- [ ] **Step 1: Write the compact render-ready fixture**
 
-Fixture contract must include:
+Include:
 
 ```text
 render_contract = normalized-2d-v1
@@ -423,11 +389,11 @@ rect + line + polyline entities
 visible annotation with placement
 ```
 
-Keep it small; do not copy all of P0113.
+Do not copy full P0113.
 
-- [ ] **Step 2: Write RED contract tests**
+- [ ] **Step 2: Write RED contract cases**
 
-Using `buildKnowledgeRepository(...)`, prove that an opted-in figure rejects each of these independently:
+Independently reject:
 
 ```text
 missing camera
@@ -445,39 +411,33 @@ duplicate entity id
 duplicate annotation id
 ```
 
-Also prove a legacy figure with no render contract and no camera/layers still passes.
+Also prove legacy without render contract/camera/layers passes.
 
 - [ ] **Step 3: Run RED**
-
-Run:
 
 ```bash
 npm test -- tests/figure-contract.test.ts
 ```
 
-Expected: render-ready malformed cases currently pass or fail for the wrong generic reason.
+Expected: malformed render-ready cases currently pass or fail only generically.
 
-- [ ] **Step 4: Implement internal `normalized-2d-v1` validation**
+- [ ] **Step 4: Implement internal render-contract validation**
 
-In `src/knowledge/loadKnowledge.ts`, validate only consumer-critical structure:
+Validate only consumer-critical structure:
 
 ```text
-exact camera contract
+exact camera/viewport
 non-empty layers
-unique local entity/annotation IDs
-supported primitive names
-required numeric coordinates for the selected primitive
+unique entity/annotation IDs
+supported primitive names using FigurePrimitive allowlist
+required finite primitive coordinates
 layer local references
-annotation placement for annotations included in layers
+placement for annotations included in layers
 ```
 
-Do not reproduce editorial fields or Knowledge review semantics.
-
-A contract other than `normalized-2d-v1` is treated as non-renderable legacy for MVP4B unless a later spec explicitly supports it.
+Do not validate editorial/review semantics already owned by Knowledge.
 
 - [ ] **Step 5: Run focal GREEN**
-
-Run:
 
 ```bash
 npm test -- tests/figure-contract.test.ts tests/knowledge-loader.test.ts
@@ -487,8 +447,6 @@ npm run typecheck
 Expected: PASS.
 
 - [ ] **Step 6: Run full regression**
-
-Run:
 
 ```bash
 npm test
@@ -506,7 +464,7 @@ git commit -m "feat: validate render-ready Knowledge figures"
 
 - [ ] **Step 8: CI/checkpoint gate and STOP**
 
-Require exact-HEAD CI success and document that legacy acceptance and render-ready fail-closed behavior both pass. STOP.
+Require exact-HEAD CI success. Record both legacy acceptance and render-ready fail-closed evidence. STOP.
 
 ---
 
@@ -517,14 +475,20 @@ Require exact-HEAD CI success and document that legacy acceptance and render-rea
 - Create: `tests/figure-diagram.test.tsx`
 
 **Interfaces:**
-- Consumes: `FigureRecord` already validated by Task 3.
+- Consumes `FigureRecord` already validated by Task 3.
 - Produces:
 
 ```ts
-export function FigureDiagram({ figure }: { figure: FigureRecord }): JSX.Element
+import type { ReactElement } from "react";
+
+export function FigureDiagram({
+  figure,
+}: {
+  figure: FigureRecord;
+}): ReactElement
 ```
 
-- Defensive contract: throws if called with a non-`normalized-2d-v1` record or unsupported/missing primitive data.
+- Defensively throws if called with a non-`normalized-2d-v1` record or unsupported/missing primitive data.
 
 - [ ] **Step 1: Write RED primitive/accessibility tests**
 
@@ -535,31 +499,29 @@ svg role = img
 aria-label uses non-empty accessibility.summary
 viewBox = "0 0 1000 1000"
 preserveAspectRatio = "xMidYMid meet"
-rect coordinates map x/y/width/height ×1000
-line two points map ×1000
+rect coordinates map ×1000
+line points map ×1000
 polyline points map ×1000
-annotation text is present as an SVG text node
+annotation appears as SVG text
 ```
 
-Add a second test where `summary = ""` and assert accessible name falls back exactly to `figure.purpose`.
+Second case: empty/missing `summary` falls back exactly to `figure.purpose`.
 
 - [ ] **Step 2: Write RED ordering/safety tests**
 
-Use layers intentionally out of order and assert rendered SVG child primitive/text sequence follows:
+Layers deliberately out of order must render by:
 
 ```text
-layer.order ascending
-then layer.id stable tie-break
-then each layer's entity_ids / annotation_ids array order
+order ascending
+then id stable tie-break
+then each layer's member-array order
 ```
 
-Use annotation text containing `<script>&` and assert it appears as text content, not executable/raw markup.
+Annotation text containing `<script>&` must appear only as text content, never raw/executable markup.
 
-Assert defensive failure for a non-render contract or unknown primitive.
+Assert defensive failure for non-render contract and unknown primitive.
 
 - [ ] **Step 3: Run renderer RED**
-
-Run:
 
 ```bash
 npm test -- tests/figure-diagram.test.tsx
@@ -567,12 +529,12 @@ npm test -- tests/figure-diagram.test.tsx
 
 Expected: FAIL because `FigureDiagram` does not exist.
 
-- [ ] **Step 4: Implement `FigureDiagram` with native SVG only**
+- [ ] **Step 4: Implement native SVG only**
 
 Rules:
 
 ```text
-normalized coordinate * 1000
+normalized coordinate × 1000
 rect -> <rect>
 line -> <line>
 polyline -> <polyline>
@@ -581,13 +543,9 @@ layer sorting deterministic
 React text escaping only
 ```
 
-Do not interpret `interaction`, `educational_sequence`, measurements, precision metadata, or visual-style metadata.
-
-No new dependency.
+Do not interpret interactions, educational sequence, measurements, precision, or visual-style metadata. No dependency addition.
 
 - [ ] **Step 5: Run renderer GREEN**
-
-Run:
 
 ```bash
 npm test -- tests/figure-diagram.test.tsx
@@ -597,8 +555,6 @@ npm run typecheck
 Expected: PASS.
 
 - [ ] **Step 6: Run full regression/build**
-
-Run:
 
 ```bash
 npm test
@@ -616,11 +572,11 @@ git commit -m "feat: render normalized Knowledge figures"
 
 - [ ] **Step 8: CI/checkpoint gate and STOP**
 
-Require exact-HEAD CI success. Confirm no package files changed. STOP.
+Require exact-HEAD CI success and confirm package files remain unchanged. STOP.
 
 ---
 
-### Task 5: Lesson support figures, deduplication, responsive presentation
+### Task 5: Lesson support figures, dedupe, and responsive presentation
 
 **Files:**
 - Modify: `src/features/lessons/LessonPage.tsx`
@@ -629,95 +585,74 @@ Require exact-HEAD CI success. Confirm no package files changed. STOP.
 - Modify: `tests/lesson-accessibility.test.tsx`
 
 **Interfaces:**
-- Consumes: `repository.figuresById`, `FigureDiagram`, and existing `LessonStep.figure_ids`.
-- Produces lesson selection rule:
+- Consumes `repository.figuresById`, `FigureDiagram`, and existing `LessonStep.figure_ids`.
+- Produces selection rule: canonical step order → each `figure_ids` array order → first-seen dedupe → only exact `normalized-2d-v1`.
+- Produces no support section when zero renderable figures remain.
 
-```text
-steps in canonical validated order
-→ figure_ids in array order
-→ first-seen dedupe
-→ keep only render_contract === normalized-2d-v1
-```
+- [ ] **Step 1: Write RED lesson fixture with repeated/order-sensitive figures**
 
-- Produces UI section only when at least one renderable figure exists.
-
-- [ ] **Step 1: Write RED lesson fixture with repeated and ordered figures**
-
-In `tests/lesson-page.test.tsx`, extend the fixture to contain:
+Use:
 
 ```text
 FIG-A = renderable normalized-2d-v1
-FIG-LEGACY = non-renderable legacy
+FIG-LEGACY = legacy
 FIG-B = renderable normalized-2d-v1
 ```
 
-Reference them across multiple steps so `FIG-A` repeats and first-seen order is `FIG-A`, `FIG-LEGACY`, `FIG-B`.
+Reference across steps so `FIG-A` repeats and first-seen order is A, legacy, B.
 
-- [ ] **Step 2: Write RED lesson integration assertions**
+- [ ] **Step 2: Write RED integration assertions**
 
 Assert:
 
 ```text
-support figure section exists when renderable figures exist
-FIG-A diagram appears exactly once
-FIG-B diagram appears exactly once
-renderable diagram order is A then B
-legacy figure creates no placeholder
-lesson heading remains unchanged
-step heading order remains unchanged
-"Ver contenido" href remains unchanged
-returnTo state remains /lecciones/:lessonId
+support figure section exists when needed
+A appears exactly once
+B appears exactly once
+renderable order A then B
+legacy produces no placeholder
+lesson heading unchanged
+step order unchanged
+Ver contenido href unchanged
+returnTo remains /lecciones/:lessonId
 ```
 
-Add a legacy-only lesson case asserting the support figure section is absent entirely.
+A legacy-only lesson must create no support figure section.
 
-- [ ] **Step 3: Extend accessibility test RED**
+- [ ] **Step 3: Write accessibility RED**
 
-In `tests/lesson-accessibility.test.tsx`, include one render-ready support figure and assert it is discoverable by role `img` with the canonical Knowledge accessible name. Preserve existing keyboard/link assertions.
+In `tests/lesson-accessibility.test.tsx`, include one render-ready figure and assert role `img` with the canonical Knowledge name; preserve existing keyboard/link assertions.
 
 - [ ] **Step 4: Run Task 5 RED**
-
-Run:
 
 ```bash
 npm test -- tests/lesson-page.test.tsx tests/lesson-accessibility.test.tsx
 ```
 
-Expected: FAIL because LessonPage does not consume figures.
+Expected: FAIL because LessonPage ignores figures.
 
-- [ ] **Step 5: Implement first-seen dedupe in `LessonPage`**
+- [ ] **Step 5: Implement local first-seen dedupe**
 
-Keep the algorithm local to `LessonPage`; do not create a selection service.
+Keep selection inside `LessonPage`; do not create a service. Visit ordered steps and `figure_ids ?? []`, keep unseen records whose contract is exactly `normalized-2d-v1`.
 
-For each ordered step, visit its `figure_ids ?? []`. Add each unseen ID once, look it up in `figuresById`, and include it only if its render contract is exactly `normalized-2d-v1`.
+Missing refs require no UI fallback because Task 2 rejects them at load time.
 
-Missing IDs should already be impossible because Task 2 loader fails closed; do not invent fallback records.
+- [ ] **Step 6: Render support figures before steps**
 
-- [ ] **Step 6: Render support figures once before the ordered list**
-
-When the deduped list is non-empty, render a section with:
+Only when the list is non-empty, render:
 
 ```text
 className = lesson-page__figures
 aria-label = Figuras de apoyo
 ```
 
-Render one `<FigureDiagram>` per selected record. Do not add a `/figuras/:id` route and do not render step interactions.
+One `FigureDiagram` per selected record. No figure route; no interaction execution.
 
 - [ ] **Step 7: Add minimal responsive CSS**
 
-In `src/styles/app.css`, add only selectors needed for:
-
-```text
-.lesson-page__figures
-.figure-diagram
-```
-
-Use existing `--surface`, `--border`, `--radius`, `--shadow`, and text variables. SVG must be `display:block`, `width:100%`, `height:auto`; do not hardcode a separate visual theme.
+Add only `.lesson-page__figures` and `.figure-diagram` rules. Reuse current surface/border/radius/shadow tokens. SVG: `display:block`, `width:100%`, `height:auto`.
 
 - [ ] **Step 8: Run focal GREEN**
-
-Run:
 
 ```bash
 npm test -- tests/lesson-page.test.tsx tests/lesson-accessibility.test.tsx tests/figure-diagram.test.tsx
@@ -726,16 +661,14 @@ npm run typecheck
 
 Expected: PASS.
 
-- [ ] **Step 9: Run MVP1/MVP2/MVP3 regression suite**
-
-Run:
+- [ ] **Step 9: Run MVP1/MVP2/MVP3 regression**
 
 ```bash
 npm test
 npm run build
 ```
 
-Expected: PASS; search/content/home/lesson navigation remains green.
+Expected: PASS.
 
 - [ ] **Step 10: Commit Task 5**
 
@@ -746,7 +679,7 @@ git commit -m "feat: show Knowledge figures in guided lessons"
 
 - [ ] **Step 11: CI/checkpoint gate and STOP**
 
-Require exact-HEAD CI success and record one-time rendering, order, legacy omission, accessibility, and navigation regression. STOP.
+Require exact-HEAD CI success. Record one-time rendering, ordering, legacy omission, accessibility, and navigation regression. STOP.
 
 ---
 
@@ -754,34 +687,29 @@ Require exact-HEAD CI success and record one-time rendering, order, legacy omiss
 
 **Files:**
 - Create: `docs/verification/knowledge-figures-mvp4b-local.md`
-- Temporary only, never commit: disposable Knowledge worktrees and a disposable Vitest real-bundle smoke file.
+- Temporary only, never commit: disposable Knowledge worktrees and disposable Vitest real-bundle smoke file.
 
 **Interfaces:**
-- Consumes exact Knowledge revisions:
-  - stable 1.0.0: `a47119aba3d4711c1ac69f33f7d236d9bc20bb78`
-  - MVP4A 1.1.0 candidate: `1eede2f0521451c011e0d41124fe0313289fa0eb`
-- Produces evidence that the same PC HEAD works with both.
+- Consumes exact Knowledge stable SHA `a47119aba3d4711c1ac69f33f7d236d9bc20bb78`.
+- Consumes exact MVP4A candidate SHA `1eede2f0521451c011e0d41124fe0313289fa0eb`.
+- Produces evidence that the same PC HEAD works against both.
 
-- [ ] **Step 1: Create two disposable Knowledge worktrees from exact SHAs**
-
-Use `git worktree` from a local `CarpiNova-Knowledge` clone; do not move its main working tree:
+- [ ] **Step 1: Create disposable Knowledge worktrees at exact SHAs**
 
 ```bash
 git -C ../CarpiNova-Knowledge worktree add <tmp>/knowledge-1.0.0 a47119aba3d4711c1ac69f33f7d236d9bc20bb78
 git -C ../CarpiNova-Knowledge worktree add <tmp>/knowledge-1.1.0 1eede2f0521451c011e0d41124fe0313289fa0eb
 ```
 
-If exact SHAs are unavailable locally, fetch them without changing branch heads.
+If absent locally, fetch exact SHAs without moving branch heads.
 
-- [ ] **Step 2: Prepare stable Knowledge 1.0.0 with the MVP4B PC branch**
-
-Run:
+- [ ] **Step 2: Prepare real Knowledge 1.0.0**
 
 ```bash
 npm run knowledge:prepare -- --knowledge-root <tmp>/knowledge-1.0.0
 ```
 
-Inspect `generated/knowledge/manifest.json` and require:
+Require generated manifest:
 
 ```text
 knowledge_version = 1.0.0
@@ -790,57 +718,45 @@ scope = BOOK
 source SHA exact
 ```
 
-Run:
+Then run `npm test`, `npm run typecheck`, `npm run build` and require PASS.
 
-```bash
-npm test
-npm run typecheck
-npm run build
-```
+- [ ] **Step 3: Run disposable 1.0.0 runtime/UI smoke**
 
-Expected: PASS.
-
-- [ ] **Step 3: Run a disposable real-bundle 1.0.0 runtime smoke**
-
-In a disposable worktree/audit context, create an uncommitted Vitest file that reads the four `generated/knowledge/*.json` files, calls the real four-argument `buildKnowledgeRepository(...)`, mounts the real lesson route, and asserts:
+In a disposable worktree/audit context, create an uncommitted Vitest test that reads the four real `generated/knowledge/*.json` files, calls the four-argument builder, mounts the real lesson route, and asserts:
 
 ```text
-repository.manifest.knowledge_version = 1.0.0
+version = 1.0.0
 LESSON-SLIDES-X-2X-PILOT resolves
 existing lesson text/links render
-no failure occurs because figures are legacy
+legacy figure data does not cause load/render failure
 ```
 
-Run it, record PASS, then delete the temporary file and verify clean product diff.
+Run it, record PASS, delete it, and verify no product diff remains.
 
-- [ ] **Step 4: Prepare candidate Knowledge 1.1.0 on the same PC HEAD**
-
-Run:
+- [ ] **Step 4: Prepare real Knowledge 1.1.0 candidate on the same PC HEAD**
 
 ```bash
 npm run knowledge:prepare -- --knowledge-root <tmp>/knowledge-1.1.0
 ```
 
-Require manifest version `1.1.0` and the same exact book/scope/source identity.
+Require version `1.1.0` and identical book/scope/source identity.
 
-- [ ] **Step 5: Run a disposable real-bundle 1.1.0 UI smoke**
+- [ ] **Step 5: Run disposable 1.1.0 real-bundle UI smoke**
 
-Using the same temporary-test pattern, assert from real generated JSON:
+Using the same disposable pattern, assert:
 
 ```text
 FIG-CPNC-2025-P0113-001 resolves exactly once in figuresById
 render_contract = normalized-2d-v1
 LESSON-SLIDES-X-2X-PILOT resolves
-lesson route exposes exactly one support figure for P0113
-support figure accessible name comes from real Knowledge
+lesson route shows exactly one support figure for P0113
+accessible name comes from real Knowledge
 5 canonical lesson steps remain available
 ```
 
-Delete the temporary test after recording PASS.
+Delete the temporary test after PASS.
 
-- [ ] **Step 6: Run full PC verification on the real 1.1.0 prepared state**
-
-Run:
+- [ ] **Step 6: Run full verification on real 1.1.0 prepared state**
 
 ```bash
 npm test
@@ -849,22 +765,11 @@ npm run build
 npm audit
 ```
 
-Expected: all PASS, audit reports no unresolved vulnerability requiring a dependency mutation in this MVP.
+Expected: all PASS.
 
-- [ ] **Step 7: Write verification evidence**
+- [ ] **Step 7: Write real-integration evidence**
 
-Create `docs/verification/knowledge-figures-mvp4b-local.md` recording:
-
-```text
-PC HEAD
-Knowledge 1.0.0 exact SHA + manifest result
-Knowledge 1.1.0 exact SHA + manifest result
-real P0113 count/contract
-real lesson figure count
-commands/results
-temporary smoke removed
-Knowledge PR #31 still draft/not merged
-```
+Create `docs/verification/knowledge-figures-mvp4b-local.md` with PC HEAD, both exact Knowledge SHAs, manifest identities, real P0113 count/contract, real lesson figure count, command results, cleanup proof, and confirmation that Knowledge PR #31 remains draft/not merged.
 
 - [ ] **Step 8: Commit evidence only**
 
@@ -875,24 +780,22 @@ git commit -m "docs: verify MVP4B Knowledge compatibility"
 
 - [ ] **Step 9: CI/checkpoint gate and STOP**
 
-Require exact-HEAD CI success after the evidence commit and a clean diff with no temporary audit files. STOP.
+Require exact-HEAD CI success and no temporary audit files. STOP.
 
 ---
 
-### Task 7: Final candidate QA, diff audit, and handoff to coordinated release decision
+### Task 7: Final candidate QA, diff audit, and handoff
 
 **Files:**
 - Create: `docs/checkpoints/2026-10-13-knowledge-figures-mvp4b-candidate.md`
-- No product file should change unless a verified regression is discovered; if one is discovered, STOP and return to its owning task instead of patching here.
+- No product file should change here unless a verified regression is found; then STOP and return to the owning task.
 
 **Interfaces:**
 - Consumes all prior task evidence.
-- Produces final status `MVP4B PC compatibility candidate PASS` only if every gate below is green.
+- Produces final status `MVP4B PC compatibility candidate PASS` only if every gate is green.
 - Does not merge PC or Knowledge and does not mark Knowledge PR #31 ready.
 
-- [ ] **Step 1: Run fresh full verification from final product HEAD**
-
-Run:
+- [ ] **Step 1: Run fresh full verification**
 
 ```bash
 npm ci
@@ -904,11 +807,9 @@ npm audit
 
 Expected: all PASS.
 
-- [ ] **Step 2: Audit the branch diff against exact MVP3 base**
+- [ ] **Step 2: Audit final diff against exact MVP3 base**
 
-Compare against:
-
-`a34ac92647be87417d2163bc6824a801deffe778`
+Compare against `a34ac92647be87417d2163bc6824a801deffe778`.
 
 Require no changes to:
 
@@ -916,18 +817,18 @@ Require no changes to:
 package.json
 package-lock.json
 .github/workflows/*
-routes.tsx
+src/app/routes.tsx
 ContentPage behavior
 search architecture
 Knowledge source data
 CarpiNova-cell
 ```
 
-unless a prior task explicitly and evidentially required them. Package/workflow changes are not expected and should block closure.
+Package/workflow changes are not expected and block closure unless a prior task explicitly proved necessity.
 
-- [ ] **Step 3: Confirm architectural guardrails**
+- [ ] **Step 3: Confirm architecture guardrails from the diff**
 
-Search the final diff and verify absence of:
+Verify absence of:
 
 ```text
 Three.js
@@ -942,28 +843,28 @@ figure standalone route
 backend/state service
 ```
 
-- [ ] **Step 4: Re-read Task 6 real-integration evidence**
+- [ ] **Step 4: Require complete real-integration evidence**
 
-Require both exact Knowledge revisions and real P0113/lesson smoke to be recorded as PASS. If evidence is incomplete, do not claim MVP4B PASS.
+Task 6 must contain PASS for both exact Knowledge revisions plus real P0113/lesson smoke. Incomplete evidence blocks closure.
 
-- [ ] **Step 5: Create the final candidate checkpoint**
+- [ ] **Step 5: Create the final checkpoint**
 
-`docs/checkpoints/2026-10-13-knowledge-figures-mvp4b-candidate.md` must record:
+`docs/checkpoints/2026-10-13-knowledge-figures-mvp4b-candidate.md` records:
 
 ```text
 final PC SHA
 final CI run/job
 full test count
-TypeScript/build/audit result
+typecheck/build/audit result
 1.0.0 compatibility PASS
-1.1.0 candidate compatibility PASS
+1.1.0 compatibility PASS
 P0113 rendered once PASS
 legacy omission PASS
 KISS/anti-noise PASS
-PC PR state DRAFT / NOT MERGED
+PC PR DRAFT / NOT MERGED
 Knowledge PR #31 DRAFT / NOT MERGED
 Knowledge public release still 1.0.0
-next action = coordinated release decision, not automatic release
+next action = coordinated release decision
 ```
 
 - [ ] **Step 6: Commit final checkpoint**
@@ -973,13 +874,13 @@ git add docs/checkpoints/2026-10-13-knowledge-figures-mvp4b-candidate.md
 git commit -m "docs: close MVP4B compatibility candidate"
 ```
 
-- [ ] **Step 7: Require final CI on documentation HEAD**
+- [ ] **Step 7: Require final CI on the checkpoint HEAD**
 
-Wait for the exact checkpoint HEAD CI. Require test, typecheck, and build success. Re-run `npm audit` locally if CI does not include it.
+Require existing CI test/typecheck/build success on exact HEAD. Re-run `npm audit` locally because current CI does not include it.
 
-- [ ] **Step 8: Final PR state and STOP**
+- [ ] **Step 8: Verify final PR states and STOP**
 
-Verify the PC PR remains `OPEN / DRAFT / NOT MERGED`. Verify Knowledge PR #31 remains `DRAFT / NOT MERGED`. Do not release Knowledge `1.1.0` in this task.
+PC PR remains `OPEN / DRAFT / NOT MERGED`. Knowledge PR #31 remains `DRAFT / NOT MERGED`. Do not release Knowledge `1.1.0`.
 
 STOP and ask for the separate coordinated release decision.
 
@@ -997,11 +898,9 @@ Task 6 — real Knowledge 1.0.0 / 1.1.0 integration
 Task 7 — final QA/checkpoint/handoff
 ```
 
-Each task is independently reviewable. Do not combine tasks after a single `continua`.
+Do not combine tasks after one `continua`.
 
 ## Expected End State
-
-If every task passes:
 
 ```text
 CarpiNova-PC accepts exact Knowledge 1.0.0 and 1.1.0
