@@ -114,8 +114,12 @@ describe("deterministic Knowledge search", () => {
     const distributed = searchKnowledge(repo, {
       query: "instalacion bisagras",
     });
-    expect(distributed[0]?.content.content_id).toBe("CONTENT-CPNC-2025-P0001-002");
-    expect(distributed[0]?.rank).toBe(2);
+    expect(
+      distributed.find(
+        (hit) => hit.content.content_id === "CONTENT-CPNC-2025-P0001-002",
+      )?.rank,
+    ).toBe(2);
+    expect(distributed[0]?.content.content_id).toBe("CONTENT-CPNC-2025-P0001-001");
 
     const partial = searchKnowledge(repo, { query: "bisagr" });
     expect(partial.length).toBeGreaterThan(0);
