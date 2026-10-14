@@ -163,6 +163,12 @@ function repository(options: { legacyOnly?: boolean } = {}) {
               figure_ids: options.legacyOnly
                 ? [FIGURE_LEGACY]
                 : [FIGURE_A, FIGURE_LEGACY],
+              interaction: options.legacyOnly
+                ? undefined
+                : {
+                    type: "highlight",
+                    target_entity_ids: [`${FIGURE_A}-rect`],
+                  },
             },
             {
               order: 3,
@@ -233,6 +239,30 @@ describe("guided lesson page", () => {
     expect(screen.getByTestId("location")).toHaveTextContent(
       `"returnTo":"/lecciones/${LESSON_ID}"`,
     );
+  });
+
+  it("activates a canonical highlight interaction without changing figure geometry", async () => {
+    const user = userEvent.setup();
+    renderAt(`/lecciones/${LESSON_ID}`);
+
+    const figureA = screen.getByRole("img", { name: "Figura A" });
+    const figureB = screen.getByRole("img", { name: "Figura B" });
+    const target = figureA.querySelector("rect");
+    const unrelated = figureB.querySelector("rect");
+
+    expect(target).not.toHaveAttribute("data-highlighted", "true");
+    expect(unrelated).not.toHaveAttribute("data-highlighted", "true");
+
+    const stepOne = screen.getByRole("heading", { level: 2, name: "Paso 1" }).closest("section");
+    expect(stepOne).not.toBeNull();
+    await user.click(within(stepOne as HTMLElement).getByRole("button", { name: "Resaltar en figura" }));
+
+    expect(target).toHaveAttribute("data-highlighted", "true");
+    expect(unrelated).not.toHaveAttribute("data-highlighted", "true");
+    expect(target).toHaveAttribute("x", "100");
+    expect(target).toHaveAttribute("y", "100");
+    expect(target).toHaveAttribute("width", "800");
+    expect(target).toHaveAttribute("height", "600");
   });
 
   it("omits the support figure section when the lesson references only legacy figures", () => {
