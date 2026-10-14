@@ -1,6 +1,7 @@
 import type {
   ContentRecord,
   FigureBundle,
+  FigurePrimitive,
   FigureRecord,
   KnowledgeBundle,
   KnowledgeManifest,
@@ -18,6 +19,11 @@ const EXPECTED_SOURCE_SHA = "318ceb94569608bfe062e3e50c7032edee79febf06102f7eec7
 const SUPPORTED_KNOWLEDGE_VERSIONS = new Set<SupportedKnowledgeVersion>([
   "1.0.0",
   "1.1.0",
+]);
+const SUPPORTED_FIGURE_PRIMITIVES = new Set<FigurePrimitive>([
+  "rect",
+  "line",
+  "polyline",
 ]);
 const MAPPING_STATUSES = new Set<MappingStatus>([
   "candidate",
@@ -224,6 +230,138 @@ function validateBundle(value: unknown): KnowledgeBundle {
   };
 }
 
+function validateFigurePoint(value: unknown, label: string): void {
+  const point = record(value, label);
+  numberField(point.x, `${label}.x`);
+  numberField(point.y, `${label}.y`);
+}
+
+function validateFigureBounds(value: unknown, label: string) {
+  const bounds = record(value, label);
+  return {
+    x: numberField(bounds.x, `${label}.x`),
+    y: numberField(bounds.y, `${label}.y`),
+    width: numberField(bounds.width, `${label}.width`),
+    height: numberField(bounds.height, `${label}.height`),
+  };
+}
+
+function validateNormalized2dFigure(item: Record<string, unknown>, label: string): void {
+  const camera = record(item.camera, `${label}.camera`);
+  const coordinateSpace = stringField(
+    camera.coordinate_space,
+    `${label}.camera.coordinate_space`,
+  );
+  if (coordinateSpace !== "normalized_figure") {
+    throw new Error(`${label}.camera.coordinate_space must be normalized_figure`);
+  }
+
+  const viewport = validateFigureBounds(camera.viewport, `${label}.camera.viewport`);
+  if (
+    viewport.x !== 0 ||
+    viewport.y !== 0 ||
+    viewport.width !== 1 ||
+    viewport.height !== 1
+  ) {
+    throw new Error(`${label}.camera.viewport must be exactly 0,0,1,1`);
+  }
+
+  if (!Array.isArray(item.layers) || item.layers.length === 0) {
+    throw new Error(`${label}.layers must be a non-empty array`);
+  }
+
+  const entities = item.entities as unknown[];
+  const entityIds = new Set<string>();
+  for (const [index, value] of entities.entries()) {
+    const entityLabel = `${label}.entities[${index}]`;
+    const entity = record(value, entityLabel);
+    const id = nonEmptyStringField(entity.id, `${entityLabel}.id`);
+    if (entityIds.has(id)) {
+      throw new Error(`Duplicate entity id: ${id}`);
+    }
+    entityIds.add(id);
+
+    const geometryLabel = `${entityLabel}.geometry`;
+    const geometry = record(entity.geometry, geometryLabel);
+    const primitive = stringField(geometry.primitive, `${geometryLabel}.primitive`);
+    if (!SUPPORTED_FIGURE_PRIMITIVES.has(primitive as FigurePrimitive)) {
+      throw new Error(`${geometryLabel}.primitive is unsupported: ${primitive}`);
+    }
+
+    if (primitive === "rect") {
+      validateFigureBounds(geometry.bounds, `${geometryLabel}.bounds`);
+      continue;
+    }
+
+    if (!Array.isArray(geometry.points)) {
+      throw new Error(`${geometryLabel}.points must be an array`);
+    }
+    const expectedLength = primitive === "line" ? 2 : 2;
+    if (
+      (primitive === "line" && geometry.points.length !== expectedLength) ||
+      (primitive === "polyline" && geometry.points.length < expectedLength)
+    ) {
+      throw new Error(
+        primitive === "line"
+          ? `${geometryLabel}.points must contain exactly 2 points`
+          : `${geometryLabel}.points must contain at least 2 points`,
+      );
+    }
+    geometry.points.forEach((point, pointIndex) =>
+      validateFigurePoint(point, `${geometryLabel}.points[${pointIndex}]`),
+    );
+  }
+
+  const annotations = item.annotations as unknown[];
+  const annotationIds = new Set<string>();
+  const annotationsById = new Map<string, Record<string, unknown>>();
+  for (const [index, value] of annotations.entries()) {
+    const annotationLabel = `${label}.annotations[${index}]`;
+    const annotation = record(value, annotationLabel);
+    const id = nonEmptyStringField(annotation.id, `${annotationLabel}.id`);
+    if (annotationIds.has(id)) {
+      throw new Error(`Duplicate annotation id: ${id}`);
+    }
+    annotationIds.add(id);
+    stringField(annotation.text, `${annotationLabel}.text`);
+    annotationsById.set(id, annotation);
+  }
+
+  for (const [index, value] of item.layers.entries()) {
+    const layerLabel = `${label}.layers[${index}]`;
+    const layer = record(value, layerLabel);
+    nonEmptyStringField(layer.id, `${layerLabel}.id`);
+    numberField(layer.order, `${layerLabel}.order`);
+
+    const entityRefs =
+      layer.entity_ids === undefined
+        ? []
+        : stringArrayField(layer.entity_ids, `${layerLabel}.entity_ids`);
+    for (const entityId of entityRefs) {
+      if (!entityIds.has(entityId)) {
+        throw new Error(`${layerLabel} references missing entity id ${entityId}`);
+      }
+    }
+
+    const annotationRefs =
+      layer.annotation_ids === undefined
+        ? []
+        : stringArrayField(layer.annotation_ids, `${layerLabel}.annotation_ids`);
+    for (const annotationId of annotationRefs) {
+      const annotation = annotationsById.get(annotationId);
+      if (!annotation) {
+        throw new Error(`${layerLabel} references missing annotation id ${annotationId}`);
+      }
+      const placement = record(
+        annotation.placement,
+        `${label}.annotations.${annotationId}.placement`,
+      );
+      numberField(placement.x, `${label}.annotations.${annotationId}.placement.x`);
+      numberField(placement.y, `${label}.annotations.${annotationId}.placement.y`);
+    }
+  }
+}
+
 function validateFigure(value: unknown, index: number): FigureRecord {
   const label = `figures[${index}]`;
   const item = record(value, label);
@@ -261,6 +399,10 @@ function validateFigure(value: unknown, index: number): FigureRecord {
           ? undefined
           : stringField(rawAccessibility.summary, `${label}.accessibility.summary`),
     };
+  }
+
+  if (renderContract === "normalized-2d-v1") {
+    validateNormalized2dFigure(item, label);
   }
 
   return {
