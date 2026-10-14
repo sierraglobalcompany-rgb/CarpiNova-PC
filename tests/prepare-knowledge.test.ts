@@ -53,7 +53,8 @@ describe("Knowledge preparation contract", () => {
   it("accepts only supported Knowledge book contracts", () => {
     expect(() => validateManifest(manifest({ knowledge_version: "1.0.0" }))).not.toThrow();
     expect(() => validateManifest(manifest({ knowledge_version: "1.1.0" }))).not.toThrow();
-    expect(() => validateManifest(manifest({ knowledge_version: "1.2.0" }))).toThrow(
+    expect(() => validateManifest(manifest({ knowledge_version: "1.2.0" }))).not.toThrow();
+    expect(() => validateManifest(manifest({ knowledge_version: "1.3.0" }))).toThrow(
       "knowledge_version",
     );
 

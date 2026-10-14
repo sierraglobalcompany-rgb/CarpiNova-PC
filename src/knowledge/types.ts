@@ -1,4 +1,4 @@
-export type SupportedKnowledgeVersion = "1.0.0" | "1.1.0";
+export type SupportedKnowledgeVersion = "1.0.0" | "1.1.0" | "1.2.0";
 export type FigurePrimitive = "rect" | "line" | "polyline";
 
 export interface KnowledgeManifest {

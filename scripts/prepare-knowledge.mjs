@@ -13,7 +13,7 @@ import { promisify } from "node:util";
 
 const execFileAsync = promisify(execFile);
 
-export const SUPPORTED_KNOWLEDGE_VERSIONS = new Set(["1.0.0", "1.1.0"]);
+export const SUPPORTED_KNOWLEDGE_VERSIONS = new Set(["1.0.0", "1.1.0", "1.2.0"]);
 export const EXPECTED_BOOK_ID = "cpnc-2025";
 export const EXPECTED_SCOPE = "BOOK";
 export const EXPECTED_SOURCE_SHA256 = "318ceb94569608bfe062e3e50c7032edee79febf06102f7eec760769a6dfd90c";

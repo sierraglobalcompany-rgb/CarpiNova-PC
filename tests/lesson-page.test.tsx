@@ -14,11 +14,23 @@ const LESSON_TITLE = "Calcular e instalar correderas con X y 2X";
 const FIGURE_A = "FIG-A";
 const FIGURE_LEGACY = "FIG-LEGACY";
 const FIGURE_B = "FIG-B";
+const MEASUREMENT_A = "MEAS-A";
+const MEASUREMENT_B = "MEAS-B";
+const GUIDED_MEASUREMENT_X = "MEAS-GUIDED-X";
+const GUIDED_MEASUREMENT_2X = "MEAS-GUIDED-2X";
+const GUIDED_MEASUREMENT_37 = "MEAS-GUIDED-37";
+const GUIDED_MEASUREMENT_REPEAT_2X = "MEAS-GUIDED-REPEAT-2X";
+
+type RepositoryOptions = {
+  legacyOnly?: boolean;
+  invalidEntityTarget?: boolean;
+  invalidMeasurementTarget?: boolean;
+};
 
 function manifest() {
   return {
     schema_version: "0.1.0",
-    knowledge_version: "1.1.0",
+    knowledge_version: "1.2.0",
     book_id: "cpnc-2025",
     scope: "BOOK",
     source_manifest_sha256: SOURCE_SHA,
@@ -51,6 +63,7 @@ function content(suffix: string, learningText: string) {
 }
 
 function renderableFigure(figureId: string, summary: string) {
+  const isFigureA = figureId === FIGURE_A;
   return {
     figure_id: figureId,
     page_id: PAGE_ID,
@@ -67,7 +80,24 @@ function renderableFigure(figureId: string, summary: string) {
         },
       },
     ],
-    annotations: [],
+    annotations: isFigureA
+      ? [
+          {
+            id: "ann-measurement-a",
+            text: "Holgura A",
+            measurement_id: MEASUREMENT_A,
+            entity_id: `${figureId}-rect`,
+            placement: { x: 0.2, y: 0.7, precision: "approximate" },
+          },
+          {
+            id: "ann-measurement-b",
+            text: "Holgura B",
+            measurement_id: MEASUREMENT_B,
+            entity_id: `${figureId}-rect`,
+            placement: { x: 0.2, y: 0.8, precision: "approximate" },
+          },
+        ]
+      : [],
     reconstruction: { render_contract: "normalized-2d-v1" },
     camera: {
       coordinate_space: "normalized_figure",
@@ -78,6 +108,7 @@ function renderableFigure(figureId: string, summary: string) {
         id: "geometry",
         order: 1,
         entity_ids: [`${figureId}-rect`],
+        annotation_ids: isFigureA ? ["ann-measurement-a", "ann-measurement-b"] : [],
       },
     ],
     accessibility: { summary },
@@ -96,10 +127,13 @@ function legacyFigure() {
   };
 }
 
-function repository(options: { legacyOnly?: boolean } = {}) {
+function repository(options: RepositoryOptions = {}) {
   const one = content("001", "Explicación del paso uno.");
   const three = content("003", "Explicación del paso tres.");
-  const five = content("005", "Explicación del paso cinco.");
+  const four = content("004", "Explicación del paso cuatro.");
+  const five = content("005", "Usa X para la gaveta y 2X para el lateral.");
+  const six = content("006", "Comienza con 37 mm desde el frente del mueble.");
+  const seven = content("007", "Repite 2X para la siguiente gaveta.");
 
   const figures = options.legacyOnly
     ? [legacyFigure()]
@@ -113,7 +147,7 @@ function repository(options: { legacyOnly?: boolean } = {}) {
     manifest(),
     {
       schema_version: "0.1.0",
-      knowledge_version: "1.1.0",
+      knowledge_version: "1.2.0",
       book_id: "cpnc-2025",
       scope: "BOOK",
       pages: [
@@ -127,34 +161,68 @@ function repository(options: { legacyOnly?: boolean } = {}) {
           section: "Correderas",
         },
       ],
-      content: [one, three, five],
-      measurements: [],
+      content: [one, three, four, five, six, seven],
+      measurements: [
+        { measurement_id: GUIDED_MEASUREMENT_X },
+        { measurement_id: GUIDED_MEASUREMENT_2X },
+        { measurement_id: GUIDED_MEASUREMENT_37 },
+        { measurement_id: GUIDED_MEASUREMENT_REPEAT_2X },
+      ],
       rules: [],
       taxonomy: {},
     },
     {
       schema_version: "0.1.0",
-      knowledge_version: "1.1.0",
+      knowledge_version: "1.2.0",
       book_id: "cpnc-2025",
       scope: "BOOK",
       figures,
     },
     {
       schema_version: "0.1.0",
-      knowledge_version: "1.1.0",
+      knowledge_version: "1.2.0",
       book_id: "cpnc-2025",
       scope: "BOOK",
       lessons: [
         {
           lesson_id: LESSON_ID,
           title: LESSON_TITLE,
-          source_content_ids: [one.content_id, three.content_id, five.content_id],
+          source_content_ids: [
+            one.content_id,
+            three.content_id,
+            four.content_id,
+            five.content_id,
+            six.content_id,
+            seven.content_id,
+          ],
           steps: [
             {
               order: 5,
               title: "Paso 5",
-              content_ids: [five.content_id],
+              content_ids: [five.content_id, six.content_id, seven.content_id],
               figure_ids: options.legacyOnly ? [FIGURE_LEGACY] : [FIGURE_B],
+              interaction: options.legacyOnly
+                ? undefined
+                : {
+                    type: "guided_sequence",
+                    sequence: [
+                      {
+                        order: 1,
+                        content_id: five.content_id,
+                        measurement_ids: [GUIDED_MEASUREMENT_X, GUIDED_MEASUREMENT_2X],
+                      },
+                      {
+                        order: 2,
+                        content_id: six.content_id,
+                        measurement_ids: [GUIDED_MEASUREMENT_37],
+                      },
+                      {
+                        order: 3,
+                        content_id: seven.content_id,
+                        measurement_ids: [GUIDED_MEASUREMENT_REPEAT_2X],
+                      },
+                    ],
+                  },
             },
             {
               order: 1,
@@ -163,12 +231,50 @@ function repository(options: { legacyOnly?: boolean } = {}) {
               figure_ids: options.legacyOnly
                 ? [FIGURE_LEGACY]
                 : [FIGURE_A, FIGURE_LEGACY],
+              interaction: options.legacyOnly
+                ? undefined
+                : {
+                    type: "highlight",
+                    target_entity_ids: options.invalidEntityTarget
+                      ? [`${FIGURE_A}-rect`, "missing-entity"]
+                      : [`${FIGURE_A}-rect`],
+                  },
             },
             {
               order: 3,
               title: "Paso 3",
               content_ids: [three.content_id],
               figure_ids: options.legacyOnly ? [FIGURE_LEGACY] : [FIGURE_A, FIGURE_B],
+              interaction: options.legacyOnly
+                ? undefined
+                : {
+                    type: "highlight_measurements",
+                    measurement_ids: options.invalidMeasurementTarget
+                      ? [MEASUREMENT_A, "MEAS-MISSING"]
+                      : [MEASUREMENT_A, MEASUREMENT_B],
+                  },
+            },
+            {
+              order: 4,
+              title: "Paso 4",
+              content_ids: [four.content_id],
+              figure_ids: options.legacyOnly ? [FIGURE_LEGACY] : [FIGURE_A],
+              interaction: options.legacyOnly
+                ? undefined
+                : {
+                    type: "identify_parts",
+                    source_content_id: four.content_id,
+                    parts: [
+                      {
+                        label: "Parte delgada",
+                        installation_location: "lateral de la gaveta",
+                      },
+                      {
+                        label: "Parte gruesa",
+                        installation_location: "costado interno del mueble",
+                      },
+                    ],
+                  },
             },
           ],
         },
@@ -186,7 +292,7 @@ function LocationProbe() {
   );
 }
 
-function renderAt(path: string, options: { legacyOnly?: boolean } = {}) {
+function renderAt(path: string, options: RepositoryOptions = {}) {
   return render(
     <KnowledgeProvider repository={repository(options)}>
       <MemoryRouter initialEntries={[path]}>
@@ -217,7 +323,7 @@ describe("guided lesson page", () => {
     const steps = screen.getByRole("list", { name: "Pasos de la lección" });
     expect(
       within(steps).getAllByRole("heading", { level: 2 }).map((heading) => heading.textContent),
-    ).toEqual(["Paso 1", "Paso 3", "Paso 5"]);
+    ).toEqual(["Paso 1", "Paso 3", "Paso 4", "Paso 5"]);
     expect(screen.getByText("Explicación del paso uno.")).toBeInTheDocument();
 
     const links = screen.getAllByRole("link", { name: "Ver contenido" });
@@ -233,6 +339,138 @@ describe("guided lesson page", () => {
     expect(screen.getByTestId("location")).toHaveTextContent(
       `"returnTo":"/lecciones/${LESSON_ID}"`,
     );
+  });
+
+  it("activates a canonical highlight interaction without changing figure geometry", async () => {
+    const user = userEvent.setup();
+    renderAt(`/lecciones/${LESSON_ID}`);
+
+    const figureA = screen.getByRole("img", { name: "Figura A" });
+    const figureB = screen.getByRole("img", { name: "Figura B" });
+    const target = figureA.querySelector("rect");
+    const unrelated = figureB.querySelector("rect");
+
+    expect(target).not.toHaveAttribute("data-highlighted", "true");
+    expect(unrelated).not.toHaveAttribute("data-highlighted", "true");
+
+    const stepOne = screen.getByRole("heading", { level: 2, name: "Paso 1" }).closest("section");
+    expect(stepOne).not.toBeNull();
+    await user.click(within(stepOne as HTMLElement).getByRole("button", { name: "Resaltar en figura" }));
+
+    expect(target).toHaveAttribute("data-highlighted", "true");
+    expect(unrelated).not.toHaveAttribute("data-highlighted", "true");
+    expect(target).toHaveAttribute("x", "100");
+    expect(target).toHaveAttribute("y", "100");
+    expect(target).toHaveAttribute("width", "800");
+    expect(target).toHaveAttribute("height", "600");
+  });
+
+  it("fails closed when any canonical entity highlight target is unresolved", () => {
+    renderAt(`/lecciones/${LESSON_ID}`, { invalidEntityTarget: true });
+
+    const stepOne = screen.getByRole("heading", { level: 2, name: "Paso 1" }).closest("section");
+    expect(stepOne).not.toBeNull();
+    expect(
+      within(stepOne as HTMLElement).queryByRole("button", { name: "Resaltar en figura" }),
+    ).not.toBeInTheDocument();
+
+    const target = screen.getByRole("img", { name: "Figura A" }).querySelector("rect");
+    expect(target).not.toHaveAttribute("data-highlighted", "true");
+  });
+
+  it("highlights only canonical measurement annotations and preserves their placement", async () => {
+    const user = userEvent.setup();
+    renderAt(`/lecciones/${LESSON_ID}`);
+
+    const figureA = screen.getByRole("img", { name: "Figura A" });
+    const measurementA = within(figureA).getByText("Holgura A");
+    const measurementB = within(figureA).getByText("Holgura B");
+
+    expect(measurementA).not.toHaveAttribute("data-highlighted", "true");
+    expect(measurementB).not.toHaveAttribute("data-highlighted", "true");
+
+    const stepThree = screen.getByRole("heading", { level: 2, name: "Paso 3" }).closest("section");
+    expect(stepThree).not.toBeNull();
+    await user.click(within(stepThree as HTMLElement).getByRole("button", { name: "Resaltar medidas" }));
+
+    expect(measurementA).toHaveAttribute("data-highlighted", "true");
+    expect(measurementB).toHaveAttribute("data-highlighted", "true");
+    expect(measurementA).toHaveAttribute("x", "200");
+    expect(measurementA).toHaveAttribute("y", "700");
+    expect(measurementB).toHaveAttribute("x", "200");
+    expect(measurementB).toHaveAttribute("y", "800");
+  });
+
+  it("fails closed when any canonical measurement highlight target is unresolved", () => {
+    renderAt(`/lecciones/${LESSON_ID}`, { invalidMeasurementTarget: true });
+
+    const stepThree = screen.getByRole("heading", { level: 2, name: "Paso 3" }).closest("section");
+    expect(stepThree).not.toBeNull();
+    expect(
+      within(stepThree as HTMLElement).queryByRole("button", { name: "Resaltar medidas" }),
+    ).not.toBeInTheDocument();
+
+    const figureA = screen.getByRole("img", { name: "Figura A" });
+    expect(within(figureA).getByText("Holgura A")).not.toHaveAttribute("data-highlighted", "true");
+    expect(within(figureA).getByText("Holgura B")).not.toHaveAttribute("data-highlighted", "true");
+  });
+
+  it("reveals only source-backed part labels without inferring figure targets", async () => {
+    const user = userEvent.setup();
+    renderAt(`/lecciones/${LESSON_ID}`);
+
+    const figureA = screen.getByRole("img", { name: "Figura A" });
+    const geometry = figureA.querySelector("rect");
+    expect(geometry).not.toHaveAttribute("data-highlighted", "true");
+
+    const stepFour = screen.getByRole("heading", { level: 2, name: "Paso 4" }).closest("section");
+    expect(stepFour).not.toBeNull();
+    expect(
+      within(stepFour as HTMLElement).queryByRole("list", { name: "Partes identificadas" }),
+    ).not.toBeInTheDocument();
+
+    await user.click(
+      within(stepFour as HTMLElement).getByRole("button", { name: "Identificar partes" }),
+    );
+
+    const parts = within(stepFour as HTMLElement).getByRole("list", {
+      name: "Partes identificadas",
+    });
+    expect(
+      within(parts).getAllByRole("listitem").map((item) => item.textContent),
+    ).toEqual([
+      "Parte delgada: lateral de la gaveta",
+      "Parte gruesa: costado interno del mueble",
+    ]);
+    expect(geometry).not.toHaveAttribute("data-highlighted", "true");
+  });
+
+  it("reveals the three canonical sequence items in order without exposing technical ids", async () => {
+    const user = userEvent.setup();
+    renderAt(`/lecciones/${LESSON_ID}`);
+
+    const stepFive = screen.getByRole("heading", { level: 2, name: "Paso 5" }).closest("section");
+    expect(stepFive).not.toBeNull();
+    expect(
+      within(stepFive as HTMLElement).queryByRole("list", { name: "Secuencia guiada" }),
+    ).not.toBeInTheDocument();
+
+    await user.click(
+      within(stepFive as HTMLElement).getByRole("button", { name: "Ver secuencia" }),
+    );
+
+    const sequence = within(stepFive as HTMLElement).getByRole("list", {
+      name: "Secuencia guiada",
+    });
+    expect(
+      within(sequence).getAllByRole("listitem").map((item) => item.textContent),
+    ).toEqual([
+      "Usa X para la gaveta y 2X para el lateral.",
+      "Comienza con 37 mm desde el frente del mueble.",
+      "Repite 2X para la siguiente gaveta.",
+    ]);
+    expect(sequence).not.toHaveTextContent(GUIDED_MEASUREMENT_X);
+    expect(sequence).not.toHaveTextContent(GUIDED_MEASUREMENT_37);
   });
 
   it("omits the support figure section when the lesson references only legacy figures", () => {
