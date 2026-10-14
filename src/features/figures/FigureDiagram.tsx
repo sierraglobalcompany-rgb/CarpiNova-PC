@@ -103,6 +103,7 @@ function renderEntity(
 
 function renderAnnotation(
   annotation: FigureRecord["annotations"][number],
+  highlighted: boolean,
 ): ReactElement {
   if (annotation.placement === undefined) {
     throw new Error(`Figure annotation ${annotation.id} requires placement`);
@@ -113,6 +114,8 @@ function renderAnnotation(
       x={scaled(annotation.placement.x, `${annotation.id}.placement.x`)}
       y={scaled(annotation.placement.y, `${annotation.id}.placement.y`)}
       fill="currentColor"
+      data-highlighted={highlighted ? "true" : undefined}
+      fontWeight={highlighted ? 700 : undefined}
     >
       {annotation.text}
     </text>
@@ -122,9 +125,11 @@ function renderAnnotation(
 export function FigureDiagram({
   figure,
   highlightedEntityIds = [],
+  highlightedMeasurementIds = [],
 }: {
   figure: FigureRecord;
   highlightedEntityIds?: readonly string[];
+  highlightedMeasurementIds?: readonly string[];
 }): ReactElement {
   if (figure.reconstruction.render_contract !== "normalized-2d-v1") {
     throw new Error("FigureDiagram requires normalized-2d-v1");
@@ -133,7 +138,8 @@ export function FigureDiagram({
     throw new Error("FigureDiagram requires non-empty layers");
   }
 
-  const highlighted = new Set(highlightedEntityIds);
+  const highlightedEntities = new Set(highlightedEntityIds);
+  const highlightedMeasurements = new Set(highlightedMeasurementIds);
   const entitiesById = new Map(figure.entities.map((entity) => [entity.id, entity] as const));
   const annotationsById = new Map(
     figure.annotations.map((annotation) => [annotation.id, annotation] as const),
@@ -150,14 +156,20 @@ export function FigureDiagram({
       if (entity === undefined) {
         throw new Error(`Figure layer ${layer.id} references missing entity ${entityId}`);
       }
-      elements.push(renderEntity(entity, highlighted.has(entity.id)));
+      elements.push(renderEntity(entity, highlightedEntities.has(entity.id)));
     }
     for (const annotationId of layer.annotation_ids ?? []) {
       const annotation = annotationsById.get(annotationId);
       if (annotation === undefined) {
         throw new Error(`Figure layer ${layer.id} references missing annotation ${annotationId}`);
       }
-      elements.push(renderAnnotation(annotation));
+      elements.push(
+        renderAnnotation(
+          annotation,
+          annotation.measurement_id !== undefined &&
+            highlightedMeasurements.has(annotation.measurement_id),
+        ),
+      );
     }
   }
 

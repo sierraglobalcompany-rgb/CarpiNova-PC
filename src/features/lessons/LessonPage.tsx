@@ -6,6 +6,20 @@ import { useKnowledge } from "../../knowledge/KnowledgeContext";
 import { selectPrimaryText } from "../content/contentPresentation";
 import { FigureDiagram } from "../figures/FigureDiagram";
 
+function stepFigures(
+  step: LessonStep,
+  figuresById: ReadonlyMap<string, FigureRecord>,
+): FigureRecord[] {
+  const figures: FigureRecord[] = [];
+  for (const figureId of step.figure_ids ?? []) {
+    const figure = figuresById.get(figureId);
+    if (figure?.reconstruction.render_contract === "normalized-2d-v1") {
+      figures.push(figure);
+    }
+  }
+  return figures;
+}
+
 function highlightTargets(
   step: LessonStep,
   figuresById: ReadonlyMap<string, FigureRecord>,
@@ -21,13 +35,38 @@ function highlightTargets(
   }
 
   const allowed = new Set<string>();
-  for (const figureId of step.figure_ids ?? []) {
-    const figure = figuresById.get(figureId);
-    if (!figure || figure.reconstruction.render_contract !== "normalized-2d-v1") {
-      continue;
-    }
+  for (const figure of stepFigures(step, figuresById)) {
     for (const entity of figure.entities) {
       allowed.add(entity.id);
+    }
+  }
+
+  return rawTargets.filter(
+    (target): target is string =>
+      typeof target === "string" && target.trim().length > 0 && allowed.has(target),
+  );
+}
+
+function measurementHighlightTargets(
+  step: LessonStep,
+  figuresById: ReadonlyMap<string, FigureRecord>,
+): string[] {
+  const interaction = step.interaction;
+  if (interaction?.type !== "highlight_measurements") {
+    return [];
+  }
+
+  const rawTargets = interaction.target_measurement_ids;
+  if (!Array.isArray(rawTargets)) {
+    return [];
+  }
+
+  const allowed = new Set<string>();
+  for (const figure of stepFigures(step, figuresById)) {
+    for (const annotation of figure.annotations) {
+      if (annotation.measurement_id !== undefined) {
+        allowed.add(annotation.measurement_id);
+      }
     }
   }
 
@@ -41,6 +80,7 @@ export function LessonPage() {
   const { lessonId } = useParams<{ lessonId: string }>();
   const repository = useKnowledge();
   const [highlightedEntityIds, setHighlightedEntityIds] = useState<readonly string[]>([]);
+  const [highlightedMeasurementIds, setHighlightedMeasurementIds] = useState<readonly string[]>([]);
   const lesson = lessonId ? repository.lessonsById.get(lessonId) : undefined;
 
   if (!lesson) {
@@ -92,6 +132,7 @@ export function LessonPage() {
                 <FigureDiagram
                   figure={figure}
                   highlightedEntityIds={highlightedEntityIds}
+                  highlightedMeasurementIds={highlightedMeasurementIds}
                 />
               </figure>
             ))}
@@ -101,9 +142,14 @@ export function LessonPage() {
 
       <ol className="lesson-page__steps" aria-label="Pasos de la lección">
         {lesson.steps.map((step) => {
-          const targets = highlightTargets(step, repository.figuresById);
-          const isActive =
-            targets.length > 0 && targets.every((target) => highlightedEntityIds.includes(target));
+          const entityTargets = highlightTargets(step, repository.figuresById);
+          const measurementTargets = measurementHighlightTargets(step, repository.figuresById);
+          const entityHighlightActive =
+            entityTargets.length > 0 &&
+            entityTargets.every((target) => highlightedEntityIds.includes(target));
+          const measurementHighlightActive =
+            measurementTargets.length > 0 &&
+            measurementTargets.every((target) => highlightedMeasurementIds.includes(target));
 
           return (
             <li key={step.order}>
@@ -130,13 +176,28 @@ export function LessonPage() {
                     </div>
                   );
                 })}
-                {targets.length > 0 ? (
+                {entityTargets.length > 0 ? (
                   <button
                     type="button"
-                    aria-pressed={isActive}
-                    onClick={() => setHighlightedEntityIds(targets)}
+                    aria-pressed={entityHighlightActive}
+                    onClick={() => {
+                      setHighlightedEntityIds(entityTargets);
+                      setHighlightedMeasurementIds([]);
+                    }}
                   >
                     Resaltar en figura
+                  </button>
+                ) : null}
+                {measurementTargets.length > 0 ? (
+                  <button
+                    type="button"
+                    aria-pressed={measurementHighlightActive}
+                    onClick={() => {
+                      setHighlightedMeasurementIds(measurementTargets);
+                      setHighlightedEntityIds([]);
+                    }}
+                  >
+                    Resaltar medidas
                   </button>
                 ) : null}
               </section>
