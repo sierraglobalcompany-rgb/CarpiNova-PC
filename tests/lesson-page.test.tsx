@@ -20,7 +20,7 @@ const MEASUREMENT_B = "MEAS-B";
 function manifest() {
   return {
     schema_version: "0.1.0",
-    knowledge_version: "1.1.0",
+    knowledge_version: "1.2.0",
     book_id: "cpnc-2025",
     scope: "BOOK",
     source_manifest_sha256: SOURCE_SHA,
@@ -120,6 +120,7 @@ function legacyFigure() {
 function repository(options: { legacyOnly?: boolean } = {}) {
   const one = content("001", "Explicación del paso uno.");
   const three = content("003", "Explicación del paso tres.");
+  const four = content("004", "Explicación del paso cuatro.");
   const five = content("005", "Explicación del paso cinco.");
 
   const figures = options.legacyOnly
@@ -134,7 +135,7 @@ function repository(options: { legacyOnly?: boolean } = {}) {
     manifest(),
     {
       schema_version: "0.1.0",
-      knowledge_version: "1.1.0",
+      knowledge_version: "1.2.0",
       book_id: "cpnc-2025",
       scope: "BOOK",
       pages: [
@@ -148,28 +149,33 @@ function repository(options: { legacyOnly?: boolean } = {}) {
           section: "Correderas",
         },
       ],
-      content: [one, three, five],
+      content: [one, three, four, five],
       measurements: [],
       rules: [],
       taxonomy: {},
     },
     {
       schema_version: "0.1.0",
-      knowledge_version: "1.1.0",
+      knowledge_version: "1.2.0",
       book_id: "cpnc-2025",
       scope: "BOOK",
       figures,
     },
     {
       schema_version: "0.1.0",
-      knowledge_version: "1.1.0",
+      knowledge_version: "1.2.0",
       book_id: "cpnc-2025",
       scope: "BOOK",
       lessons: [
         {
           lesson_id: LESSON_ID,
           title: LESSON_TITLE,
-          source_content_ids: [one.content_id, three.content_id, five.content_id],
+          source_content_ids: [
+            one.content_id,
+            three.content_id,
+            four.content_id,
+            five.content_id,
+          ],
           steps: [
             {
               order: 5,
@@ -201,6 +207,28 @@ function repository(options: { legacyOnly?: boolean } = {}) {
                 : {
                     type: "highlight_measurements",
                     measurement_ids: [MEASUREMENT_A, MEASUREMENT_B],
+                  },
+            },
+            {
+              order: 4,
+              title: "Paso 4",
+              content_ids: [four.content_id],
+              figure_ids: options.legacyOnly ? [FIGURE_LEGACY] : [FIGURE_A],
+              interaction: options.legacyOnly
+                ? undefined
+                : {
+                    type: "identify_parts",
+                    source_content_id: four.content_id,
+                    parts: [
+                      {
+                        label: "Parte delgada",
+                        installation_location: "lateral de la gaveta",
+                      },
+                      {
+                        label: "Parte gruesa",
+                        installation_location: "costado interno del mueble",
+                      },
+                    ],
                   },
             },
           ],
@@ -250,7 +278,7 @@ describe("guided lesson page", () => {
     const steps = screen.getByRole("list", { name: "Pasos de la lección" });
     expect(
       within(steps).getAllByRole("heading", { level: 2 }).map((heading) => heading.textContent),
-    ).toEqual(["Paso 1", "Paso 3", "Paso 5"]);
+    ).toEqual(["Paso 1", "Paso 3", "Paso 4", "Paso 5"]);
     expect(screen.getByText("Explicación del paso uno.")).toBeInTheDocument();
 
     const links = screen.getAllByRole("link", { name: "Ver contenido" });
@@ -313,6 +341,36 @@ describe("guided lesson page", () => {
     expect(measurementA).toHaveAttribute("y", "700");
     expect(measurementB).toHaveAttribute("x", "200");
     expect(measurementB).toHaveAttribute("y", "800");
+  });
+
+  it("reveals only source-backed part labels without inferring figure targets", async () => {
+    const user = userEvent.setup();
+    renderAt(`/lecciones/${LESSON_ID}`);
+
+    const figureA = screen.getByRole("img", { name: "Figura A" });
+    const geometry = figureA.querySelector("rect");
+    expect(geometry).not.toHaveAttribute("data-highlighted", "true");
+
+    const stepFour = screen.getByRole("heading", { level: 2, name: "Paso 4" }).closest("section");
+    expect(stepFour).not.toBeNull();
+    expect(
+      within(stepFour as HTMLElement).queryByRole("list", { name: "Partes identificadas" }),
+    ).not.toBeInTheDocument();
+
+    await user.click(
+      within(stepFour as HTMLElement).getByRole("button", { name: "Identificar partes" }),
+    );
+
+    const parts = within(stepFour as HTMLElement).getByRole("list", {
+      name: "Partes identificadas",
+    });
+    expect(
+      within(parts).getAllByRole("listitem").map((item) => item.textContent),
+    ).toEqual([
+      "Parte delgada: lateral de la gaveta",
+      "Parte gruesa: costado interno del mueble",
+    ]);
+    expect(geometry).not.toHaveAttribute("data-highlighted", "true");
   });
 
   it("omits the support figure section when the lesson references only legacy figures", () => {
