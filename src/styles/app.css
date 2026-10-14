@@ -340,6 +340,37 @@ p {
   margin: 0;
 }
 
+.lesson-page__figures {
+  margin-top: 1.5rem;
+}
+
+.lesson-page__figures > h2 {
+  margin: 0 0 0.9rem;
+}
+
+.lesson-page__figure-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.lesson-page__figure {
+  margin: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  color: var(--text);
+  padding: 1rem;
+}
+
+.lesson-page__figure svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 28rem;
+}
+
 .lesson-page__steps {
   display: grid;
   gap: 1rem;
@@ -422,6 +453,14 @@ p {
   .search-result-card,
   .lesson-page__steps > li > section {
     padding: 1rem;
+  }
+
+  .lesson-page__figure-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .lesson-page__figure {
+    padding: 0.75rem;
   }
 
   .lesson-page__steps {
