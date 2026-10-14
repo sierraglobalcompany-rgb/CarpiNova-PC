@@ -187,7 +187,7 @@ describe("runtime Knowledge boundary", () => {
     expect(repository.lessonsById.get(LESSON_ID)?.steps).toHaveLength(5);
   });
 
-  it.each(["1.0.0", "1.1.0"])("accepts supported runtime Knowledge %s", (version) => {
+  it.each(["1.0.0", "1.1.0", "1.2.0"])("accepts supported runtime Knowledge %s", (version) => {
     expect(() =>
       buildKnowledgeRepository(
         manifest({ knowledge_version: version }),
@@ -198,13 +198,13 @@ describe("runtime Knowledge boundary", () => {
     ).not.toThrow();
   });
 
-  it("rejects unapproved runtime Knowledge 1.2.0", () => {
+  it("rejects unapproved runtime Knowledge 1.3.0", () => {
     expect(() =>
       buildKnowledgeRepository(
-        manifest({ knowledge_version: "1.2.0" }),
-        bundle({ knowledge_version: "1.2.0" }),
-        emptyFiguresBundle({ knowledge_version: "1.2.0" }),
-        emptyLessonsBundle({ knowledge_version: "1.2.0" }),
+        manifest({ knowledge_version: "1.3.0" }),
+        bundle({ knowledge_version: "1.3.0" }),
+        emptyFiguresBundle({ knowledge_version: "1.3.0" }),
+        emptyLessonsBundle({ knowledge_version: "1.3.0" }),
       ),
     ).toThrow("knowledge_version");
   });
@@ -355,7 +355,7 @@ describe("runtime Knowledge boundary", () => {
   });
 
   it.each([
-    ["knowledge_version", "1.2.0"],
+    ["knowledge_version", "1.3.0"],
     ["book_id", "other-book"],
     ["scope", "BATCH"],
     ["source_manifest_sha256", "f".repeat(64)],
