@@ -56,7 +56,7 @@ function measurementHighlightTargets(
     return [];
   }
 
-  const rawTargets = interaction.target_measurement_ids;
+  const rawTargets = interaction.measurement_ids;
   if (!Array.isArray(rawTargets)) {
     return [];
   }
