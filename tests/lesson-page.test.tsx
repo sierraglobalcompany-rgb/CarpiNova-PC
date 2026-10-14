@@ -17,6 +17,12 @@ const FIGURE_B = "FIG-B";
 const MEASUREMENT_A = "MEAS-A";
 const MEASUREMENT_B = "MEAS-B";
 
+type RepositoryOptions = {
+  legacyOnly?: boolean;
+  invalidEntityTarget?: boolean;
+  invalidMeasurementTarget?: boolean;
+};
+
 function manifest() {
   return {
     schema_version: "0.1.0",
@@ -117,7 +123,7 @@ function legacyFigure() {
   };
 }
 
-function repository(options: { legacyOnly?: boolean } = {}) {
+function repository(options: RepositoryOptions = {}) {
   const one = content("001", "Explicación del paso uno.");
   const three = content("003", "Explicación del paso tres.");
   const four = content("004", "Explicación del paso cuatro.");
@@ -194,7 +200,9 @@ function repository(options: { legacyOnly?: boolean } = {}) {
                 ? undefined
                 : {
                     type: "highlight",
-                    target_entity_ids: [`${FIGURE_A}-rect`],
+                    target_entity_ids: options.invalidEntityTarget
+                      ? [`${FIGURE_A}-rect`, "missing-entity"]
+                      : [`${FIGURE_A}-rect`],
                   },
             },
             {
@@ -206,7 +214,9 @@ function repository(options: { legacyOnly?: boolean } = {}) {
                 ? undefined
                 : {
                     type: "highlight_measurements",
-                    measurement_ids: [MEASUREMENT_A, MEASUREMENT_B],
+                    measurement_ids: options.invalidMeasurementTarget
+                      ? [MEASUREMENT_A, "MEAS-MISSING"]
+                      : [MEASUREMENT_A, MEASUREMENT_B],
                   },
             },
             {
@@ -247,7 +257,7 @@ function LocationProbe() {
   );
 }
 
-function renderAt(path: string, options: { legacyOnly?: boolean } = {}) {
+function renderAt(path: string, options: RepositoryOptions = {}) {
   return render(
     <KnowledgeProvider repository={repository(options)}>
       <MemoryRouter initialEntries={[path]}>
@@ -320,6 +330,19 @@ describe("guided lesson page", () => {
     expect(target).toHaveAttribute("height", "600");
   });
 
+  it("fails closed when any canonical entity highlight target is unresolved", () => {
+    renderAt(`/lecciones/${LESSON_ID}`, { invalidEntityTarget: true });
+
+    const stepOne = screen.getByRole("heading", { level: 2, name: "Paso 1" }).closest("section");
+    expect(stepOne).not.toBeNull();
+    expect(
+      within(stepOne as HTMLElement).queryByRole("button", { name: "Resaltar en figura" }),
+    ).not.toBeInTheDocument();
+
+    const target = screen.getByRole("img", { name: "Figura A" }).querySelector("rect");
+    expect(target).not.toHaveAttribute("data-highlighted", "true");
+  });
+
   it("highlights only canonical measurement annotations and preserves their placement", async () => {
     const user = userEvent.setup();
     renderAt(`/lecciones/${LESSON_ID}`);
@@ -341,6 +364,20 @@ describe("guided lesson page", () => {
     expect(measurementA).toHaveAttribute("y", "700");
     expect(measurementB).toHaveAttribute("x", "200");
     expect(measurementB).toHaveAttribute("y", "800");
+  });
+
+  it("fails closed when any canonical measurement highlight target is unresolved", () => {
+    renderAt(`/lecciones/${LESSON_ID}`, { invalidMeasurementTarget: true });
+
+    const stepThree = screen.getByRole("heading", { level: 2, name: "Paso 3" }).closest("section");
+    expect(stepThree).not.toBeNull();
+    expect(
+      within(stepThree as HTMLElement).queryByRole("button", { name: "Resaltar medidas" }),
+    ).not.toBeInTheDocument();
+
+    const figureA = screen.getByRole("img", { name: "Figura A" });
+    expect(within(figureA).getByText("Holgura A")).not.toHaveAttribute("data-highlighted", "true");
+    expect(within(figureA).getByText("Holgura B")).not.toHaveAttribute("data-highlighted", "true");
   });
 
   it("reveals only source-backed part labels without inferring figure targets", async () => {
