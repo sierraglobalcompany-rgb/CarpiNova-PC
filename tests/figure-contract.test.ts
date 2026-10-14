@@ -214,7 +214,7 @@ describe("normalized-2d-v1 consumer contract", () => {
 
   it("rejects a rect without finite bounds", () => {
     const figure = cloneFigure();
-    figure.entities[0].geometry.bounds.width = Number.NaN;
+    figure.entities[0].geometry.bounds!.width = Number.NaN;
     expect(() => build(figure)).toThrow("bounds");
   });
 
