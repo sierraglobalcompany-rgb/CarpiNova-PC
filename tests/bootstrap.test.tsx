@@ -42,6 +42,13 @@ function validRepository(): KnowledgeRepository {
       knowledge_version: "1.0.0",
       book_id: "cpnc-2025",
       scope: "BOOK",
+      figures: [],
+    },
+    {
+      schema_version: "0.1.0",
+      knowledge_version: "1.0.0",
+      book_id: "cpnc-2025",
+      scope: "BOOK",
       lessons: [],
     },
   );
