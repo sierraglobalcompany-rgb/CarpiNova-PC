@@ -19,6 +19,7 @@ const EXPECTED_SOURCE_SHA = "318ceb94569608bfe062e3e50c7032edee79febf06102f7eec7
 const SUPPORTED_KNOWLEDGE_VERSIONS = new Set<SupportedKnowledgeVersion>([
   "1.0.0",
   "1.1.0",
+  "1.2.0",
 ]);
 const SUPPORTED_FIGURE_PRIMITIVES = new Set<FigurePrimitive>([
   "rect",
@@ -72,7 +73,9 @@ function validateManifest(value: unknown): KnowledgeManifest {
   const manifest = record(value, "manifest");
   const knowledgeVersion = stringField(manifest.knowledge_version, "knowledge_version");
   if (!SUPPORTED_KNOWLEDGE_VERSIONS.has(knowledgeVersion as SupportedKnowledgeVersion)) {
-    throw new Error("knowledge_version must be one of 1.0.0, 1.1.0");
+    throw new Error(
+      `knowledge_version must be one of ${[...SUPPORTED_KNOWLEDGE_VERSIONS].join(", ")}`,
+    );
   }
 
   const expected: Record<string, string> = {
