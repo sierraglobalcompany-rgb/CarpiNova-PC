@@ -80,6 +80,8 @@ function repository(records: ContentRecord[]): KnowledgeRepository {
     },
     pagesById: new Map([[PAGE_ID, page]]),
     contentById: new Map(records.map((record) => [record.content_id, record])),
+    figures: [],
+    figuresById: new Map(),
     lessons: [],
     lessonsById: new Map(),
   };
