@@ -6,6 +6,11 @@ import { useKnowledge } from "../../knowledge/KnowledgeContext";
 import { selectPrimaryText } from "../content/contentPresentation";
 import { FigureDiagram } from "../figures/FigureDiagram";
 
+interface IdentifiedPart {
+  label: string;
+  installationLocation: string;
+}
+
 function stepFigures(
   step: LessonStep,
   figuresById: ReadonlyMap<string, FigureRecord>,
@@ -76,11 +81,52 @@ function measurementHighlightTargets(
   );
 }
 
+function identifiedParts(step: LessonStep): IdentifiedPart[] {
+  const interaction = step.interaction;
+  if (interaction?.type !== "identify_parts") {
+    return [];
+  }
+
+  const sourceContentId = interaction.source_content_id;
+  if (
+    typeof sourceContentId !== "string" ||
+    !step.content_ids.includes(sourceContentId) ||
+    !Array.isArray(interaction.parts) ||
+    interaction.parts.length === 0
+  ) {
+    return [];
+  }
+
+  const parts: IdentifiedPart[] = [];
+  for (const rawPart of interaction.parts) {
+    if (typeof rawPart !== "object" || rawPart === null || Array.isArray(rawPart)) {
+      return [];
+    }
+
+    const part = rawPart as Record<string, unknown>;
+    const label = part.label;
+    const installationLocation = part.installation_location;
+    if (
+      typeof label !== "string" ||
+      label.trim().length === 0 ||
+      typeof installationLocation !== "string" ||
+      installationLocation.trim().length === 0
+    ) {
+      return [];
+    }
+
+    parts.push({ label, installationLocation });
+  }
+
+  return parts;
+}
+
 export function LessonPage() {
   const { lessonId } = useParams<{ lessonId: string }>();
   const repository = useKnowledge();
   const [highlightedEntityIds, setHighlightedEntityIds] = useState<readonly string[]>([]);
   const [highlightedMeasurementIds, setHighlightedMeasurementIds] = useState<readonly string[]>([]);
+  const [identifiedStepOrder, setIdentifiedStepOrder] = useState<number | null>(null);
   const lesson = lessonId ? repository.lessonsById.get(lessonId) : undefined;
 
   if (!lesson) {
@@ -144,12 +190,15 @@ export function LessonPage() {
         {lesson.steps.map((step) => {
           const entityTargets = highlightTargets(step, repository.figuresById);
           const measurementTargets = measurementHighlightTargets(step, repository.figuresById);
+          const parts = identifiedParts(step);
           const entityHighlightActive =
             entityTargets.length > 0 &&
             entityTargets.every((target) => highlightedEntityIds.includes(target));
           const measurementHighlightActive =
             measurementTargets.length > 0 &&
             measurementTargets.every((target) => highlightedMeasurementIds.includes(target));
+          const identifiedPartsVisible =
+            parts.length > 0 && identifiedStepOrder === step.order;
 
           return (
             <li key={step.order}>
@@ -199,6 +248,28 @@ export function LessonPage() {
                   >
                     Resaltar medidas
                   </button>
+                ) : null}
+                {parts.length > 0 ? (
+                  <>
+                    <button
+                      type="button"
+                      aria-expanded={identifiedPartsVisible}
+                      onClick={() =>
+                        setIdentifiedStepOrder(identifiedPartsVisible ? null : step.order)
+                      }
+                    >
+                      Identificar partes
+                    </button>
+                    {identifiedPartsVisible ? (
+                      <ul aria-label="Partes identificadas">
+                        {parts.map((part) => (
+                          <li key={`${part.label}:${part.installationLocation}`}>
+                            <strong>{part.label}</strong>: {part.installationLocation}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
+                  </>
                 ) : null}
               </section>
             </li>
