@@ -1,5 +1,7 @@
 import type {
   ContentRecord,
+  FigureBundle,
+  FigureRecord,
   KnowledgeBundle,
   KnowledgeManifest,
   KnowledgeRepository,
@@ -9,9 +11,14 @@ import type {
   MappingStatus,
   PageRecord,
   SourceRecord,
+  SupportedKnowledgeVersion,
 } from "./types";
 
 const EXPECTED_SOURCE_SHA = "318ceb94569608bfe062e3e50c7032edee79febf06102f7eec760769a6dfd90c";
+const SUPPORTED_KNOWLEDGE_VERSIONS = new Set<SupportedKnowledgeVersion>([
+  "1.0.0",
+  "1.1.0",
+]);
 const MAPPING_STATUSES = new Set<MappingStatus>([
   "candidate",
   "verified",
@@ -33,6 +40,14 @@ function stringField(value: unknown, label: string): string {
   return value;
 }
 
+function nonEmptyStringField(value: unknown, label: string): string {
+  const result = stringField(value, label);
+  if (result.trim().length === 0) {
+    throw new Error(`${label} must be a non-empty string`);
+  }
+  return result;
+}
+
 function numberField(value: unknown, label: string): number {
   if (typeof value !== "number" || !Number.isFinite(value)) {
     throw new Error(`${label} must be a number`);
@@ -49,8 +64,12 @@ function stringArrayField(value: unknown, label: string): string[] {
 
 function validateManifest(value: unknown): KnowledgeManifest {
   const manifest = record(value, "manifest");
+  const knowledgeVersion = stringField(manifest.knowledge_version, "knowledge_version");
+  if (!SUPPORTED_KNOWLEDGE_VERSIONS.has(knowledgeVersion as SupportedKnowledgeVersion)) {
+    throw new Error("knowledge_version must be one of 1.0.0, 1.1.0");
+  }
+
   const expected: Record<string, string> = {
-    knowledge_version: "1.0.0",
     book_id: "cpnc-2025",
     scope: "BOOK",
     source_manifest_sha256: EXPECTED_SOURCE_SHA,
@@ -205,6 +224,118 @@ function validateBundle(value: unknown): KnowledgeBundle {
   };
 }
 
+function validateFigure(value: unknown, index: number): FigureRecord {
+  const label = `figures[${index}]`;
+  const item = record(value, label);
+  if (!Array.isArray(item.entities)) {
+    throw new Error(`${label}.entities must be an array`);
+  }
+  if (!Array.isArray(item.annotations)) {
+    throw new Error(`${label}.annotations must be an array`);
+  }
+  const reconstruction = record(item.reconstruction, `${label}.reconstruction`);
+  const renderContract =
+    reconstruction.render_contract === undefined
+      ? undefined
+      : stringField(reconstruction.render_contract, `${label}.reconstruction.render_contract`);
+
+  let layers: FigureRecord["layers"];
+  if (item.layers !== undefined) {
+    if (!Array.isArray(item.layers)) {
+      throw new Error(`${label}.layers must be an array`);
+    }
+    layers = [...item.layers] as FigureRecord["layers"];
+  }
+
+  let camera: FigureRecord["camera"];
+  if (item.camera !== undefined) {
+    camera = record(item.camera, `${label}.camera`) as unknown as FigureRecord["camera"];
+  }
+
+  let accessibility: FigureRecord["accessibility"];
+  if (item.accessibility !== undefined) {
+    const rawAccessibility = record(item.accessibility, `${label}.accessibility`);
+    accessibility = {
+      summary:
+        rawAccessibility.summary === undefined
+          ? undefined
+          : stringField(rawAccessibility.summary, `${label}.accessibility.summary`),
+    };
+  }
+
+  return {
+    figure_id: nonEmptyStringField(item.figure_id, `${label}.figure_id`),
+    page_id: stringField(item.page_id, `${label}.page_id`),
+    type: stringField(item.type, `${label}.type`),
+    purpose: stringField(item.purpose, `${label}.purpose`),
+    entities: [...item.entities] as FigureRecord["entities"],
+    annotations: [...item.annotations] as FigureRecord["annotations"],
+    layers,
+    camera,
+    reconstruction: {
+      render_contract: renderContract,
+    },
+    accessibility,
+  };
+}
+
+function validateFiguresBundle(
+  value: unknown,
+  manifest: KnowledgeManifest,
+  pagesById: Map<string, PageRecord>,
+): FigureBundle {
+  const bundle = record(value, "figures.bundle.json");
+  if (!Array.isArray(bundle.figures)) {
+    throw new Error("figures must be an array");
+  }
+
+  const identities: Array<keyof Pick<
+    KnowledgeManifest,
+    "knowledge_version" | "book_id" | "scope"
+  >> = ["knowledge_version", "book_id", "scope"];
+  for (const field of identities) {
+    if (bundle[field] === undefined) {
+      continue;
+    }
+    const actual = stringField(bundle[field], `figures.${field}`);
+    if (actual !== manifest[field]) {
+      throw new Error(`figures.${field} must be ${manifest[field]}`);
+    }
+  }
+
+  const figures = bundle.figures.map(validateFigure);
+  const seen = new Set<string>();
+  for (const figure of figures) {
+    if (seen.has(figure.figure_id)) {
+      throw new Error(`Duplicate figure_id: ${figure.figure_id}`);
+    }
+    seen.add(figure.figure_id);
+    if (!pagesById.has(figure.page_id)) {
+      throw new Error(`Figure ${figure.figure_id} references missing page_id ${figure.page_id}`);
+    }
+  }
+
+  return {
+    schema_version:
+      bundle.schema_version === undefined
+        ? undefined
+        : stringField(bundle.schema_version, "figures.schema_version"),
+    knowledge_version:
+      bundle.knowledge_version === undefined
+        ? undefined
+        : stringField(bundle.knowledge_version, "figures.knowledge_version"),
+    book_id:
+      bundle.book_id === undefined
+        ? undefined
+        : stringField(bundle.book_id, "figures.book_id"),
+    scope:
+      bundle.scope === undefined
+        ? undefined
+        : stringField(bundle.scope, "figures.scope"),
+    figures,
+  };
+}
+
 function validateLessonStep(
   value: unknown,
   lessonIndex: number,
@@ -265,6 +396,7 @@ function validateLessonsBundle(
   value: unknown,
   manifest: KnowledgeManifest,
   contentById: Map<string, ContentRecord>,
+  figuresById: Map<string, FigureRecord>,
 ): LessonsBundle {
   const bundle = record(value, "lessons.bundle.json");
   if (!Array.isArray(bundle.lessons)) {
@@ -304,6 +436,11 @@ function validateLessonsBundle(
           throw new Error(`Lesson ${lesson.lesson_id} references missing content_id ${contentId}`);
         }
       }
+      for (const figureId of step.figure_ids ?? []) {
+        if (!figuresById.has(figureId)) {
+          throw new Error(`Lesson ${lesson.lesson_id} references missing figure_id ${figureId}`);
+        }
+      }
     }
   }
 
@@ -315,9 +452,15 @@ function validateLessonsBundle(
     knowledge_version:
       bundle.knowledge_version === undefined
         ? undefined
-        : (bundle.knowledge_version as string),
-    book_id: bundle.book_id === undefined ? undefined : (bundle.book_id as string),
-    scope: bundle.scope === undefined ? undefined : (bundle.scope as string),
+        : stringField(bundle.knowledge_version, "lessons.knowledge_version"),
+    book_id:
+      bundle.book_id === undefined
+        ? undefined
+        : stringField(bundle.book_id, "lessons.book_id"),
+    scope:
+      bundle.scope === undefined
+        ? undefined
+        : stringField(bundle.scope, "lessons.scope"),
     lessons,
   };
 }
@@ -325,6 +468,7 @@ function validateLessonsBundle(
 export function buildKnowledgeRepository(
   manifestValue: unknown,
   bundleValue: unknown,
+  figuresValue: unknown,
   lessonsValue: unknown,
 ): KnowledgeRepository {
   const manifest = validateManifest(manifestValue);
@@ -352,7 +496,16 @@ export function buildKnowledgeRepository(
     contentById.set(item.content_id, item);
   }
 
-  const lessonsBundle = validateLessonsBundle(lessonsValue, manifest, contentById);
+  const figuresBundle = validateFiguresBundle(figuresValue, manifest, pagesById);
+  const figuresById = new Map(
+    figuresBundle.figures.map((figure) => [figure.figure_id, figure] as const),
+  );
+  const lessonsBundle = validateLessonsBundle(
+    lessonsValue,
+    manifest,
+    contentById,
+    figuresById,
+  );
   const lessonsById = new Map(
     lessonsBundle.lessons.map((lesson) => [lesson.lesson_id, lesson] as const),
   );
@@ -362,6 +515,8 @@ export function buildKnowledgeRepository(
     bundle,
     pagesById,
     contentById,
+    figures: figuresBundle.figures,
+    figuresById,
     lessons: lessonsBundle.lessons,
     lessonsById,
   };
@@ -386,6 +541,7 @@ export async function loadKnowledge(
   const base = baseUrl.replace(/\/+$/, "");
   const manifest = await fetchJson(fetchImpl, `${base}/manifest.json`);
   const bundle = await fetchJson(fetchImpl, `${base}/knowledge.bundle.json`);
+  const figures = await fetchJson(fetchImpl, `${base}/figures.bundle.json`);
   const lessons = await fetchJson(fetchImpl, `${base}/lessons.bundle.json`);
-  return buildKnowledgeRepository(manifest, bundle, lessons);
+  return buildKnowledgeRepository(manifest, bundle, figures, lessons);
 }
