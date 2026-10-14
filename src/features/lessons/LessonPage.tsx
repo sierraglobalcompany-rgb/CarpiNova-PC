@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
-import type { FigureRecord, LessonStep } from "../../knowledge/types";
+import type { ContentRecord, FigureRecord, LessonStep } from "../../knowledge/types";
 import { useKnowledge } from "../../knowledge/KnowledgeContext";
 import { selectPrimaryText } from "../content/contentPresentation";
 import { FigureDiagram } from "../figures/FigureDiagram";
@@ -9,6 +9,11 @@ import { FigureDiagram } from "../figures/FigureDiagram";
 interface IdentifiedPart {
   label: string;
   installationLocation: string;
+}
+
+interface GuidedSequenceItem {
+  order: number;
+  contentId: string;
 }
 
 function stepFigures(
@@ -121,12 +126,86 @@ function identifiedParts(step: LessonStep): IdentifiedPart[] {
   return parts;
 }
 
+function measurementIds(measurements: readonly unknown[]): Set<string> {
+  const ids = new Set<string>();
+  for (const rawMeasurement of measurements) {
+    if (
+      typeof rawMeasurement !== "object" ||
+      rawMeasurement === null ||
+      Array.isArray(rawMeasurement)
+    ) {
+      continue;
+    }
+
+    const measurementId = (rawMeasurement as Record<string, unknown>).measurement_id;
+    if (typeof measurementId === "string" && measurementId.trim().length > 0) {
+      ids.add(measurementId);
+    }
+  }
+  return ids;
+}
+
+function guidedSequence(
+  step: LessonStep,
+  contentById: ReadonlyMap<string, ContentRecord>,
+  measurements: readonly unknown[],
+): GuidedSequenceItem[] {
+  const interaction = step.interaction;
+  if (
+    interaction?.type !== "guided_sequence" ||
+    !Array.isArray(interaction.sequence) ||
+    interaction.sequence.length === 0
+  ) {
+    return [];
+  }
+
+  const allowedMeasurementIds = measurementIds(measurements);
+  const sequence: GuidedSequenceItem[] = [];
+  const seenOrders = new Set<number>();
+
+  for (const rawItem of interaction.sequence) {
+    if (typeof rawItem !== "object" || rawItem === null || Array.isArray(rawItem)) {
+      return [];
+    }
+
+    const item = rawItem as Record<string, unknown>;
+    const order = item.order;
+    const contentId = item.content_id;
+    const rawMeasurementIds = item.measurement_ids;
+    if (
+      typeof order !== "number" ||
+      !Number.isInteger(order) ||
+      order <= 0 ||
+      seenOrders.has(order) ||
+      typeof contentId !== "string" ||
+      !step.content_ids.includes(contentId) ||
+      !contentById.has(contentId) ||
+      !Array.isArray(rawMeasurementIds) ||
+      rawMeasurementIds.length === 0 ||
+      !rawMeasurementIds.every(
+        (measurementId) =>
+          typeof measurementId === "string" &&
+          measurementId.trim().length > 0 &&
+          allowedMeasurementIds.has(measurementId),
+      )
+    ) {
+      return [];
+    }
+
+    seenOrders.add(order);
+    sequence.push({ order, contentId });
+  }
+
+  return sequence.sort((a, b) => a.order - b.order);
+}
+
 export function LessonPage() {
   const { lessonId } = useParams<{ lessonId: string }>();
   const repository = useKnowledge();
   const [highlightedEntityIds, setHighlightedEntityIds] = useState<readonly string[]>([]);
   const [highlightedMeasurementIds, setHighlightedMeasurementIds] = useState<readonly string[]>([]);
   const [identifiedStepOrder, setIdentifiedStepOrder] = useState<number | null>(null);
+  const [guidedStepOrder, setGuidedStepOrder] = useState<number | null>(null);
   const lesson = lessonId ? repository.lessonsById.get(lessonId) : undefined;
 
   if (!lesson) {
@@ -191,6 +270,11 @@ export function LessonPage() {
           const entityTargets = highlightTargets(step, repository.figuresById);
           const measurementTargets = measurementHighlightTargets(step, repository.figuresById);
           const parts = identifiedParts(step);
+          const sequence = guidedSequence(
+            step,
+            repository.contentById,
+            repository.bundle.measurements,
+          );
           const entityHighlightActive =
             entityTargets.length > 0 &&
             entityTargets.every((target) => highlightedEntityIds.includes(target));
@@ -199,6 +283,8 @@ export function LessonPage() {
             measurementTargets.every((target) => highlightedMeasurementIds.includes(target));
           const identifiedPartsVisible =
             parts.length > 0 && identifiedStepOrder === step.order;
+          const guidedSequenceVisible =
+            sequence.length > 0 && guidedStepOrder === step.order;
 
           return (
             <li key={step.order}>
@@ -268,6 +354,31 @@ export function LessonPage() {
                           </li>
                         ))}
                       </ul>
+                    ) : null}
+                  </>
+                ) : null}
+                {sequence.length > 0 ? (
+                  <>
+                    <button
+                      type="button"
+                      aria-expanded={guidedSequenceVisible}
+                      onClick={() =>
+                        setGuidedStepOrder(guidedSequenceVisible ? null : step.order)
+                      }
+                    >
+                      Ver secuencia
+                    </button>
+                    {guidedSequenceVisible ? (
+                      <ol aria-label="Secuencia guiada">
+                        {sequence.map((item) => {
+                          const content = repository.contentById.get(item.contentId);
+                          if (!content) {
+                            return null;
+                          }
+                          const primary = selectPrimaryText(content);
+                          return <li key={item.order}>{primary.text}</li>;
+                        })}
+                      </ol>
                     ) : null}
                   </>
                 ) : null}
