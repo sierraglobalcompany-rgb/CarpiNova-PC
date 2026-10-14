@@ -7,6 +7,7 @@ import {
 
 const SOURCE_SHA = "318ceb94569608bfe062e3e50c7032edee79febf06102f7eec760769a6dfd90c";
 const CONTENT_ID = "CONTENT-CPNC-2025-P0001-001";
+const FIGURE_ID = "FIG-CPNC-2025-P0001-001";
 const LESSON_ID = "LESSON-SLIDES-X-2X-PILOT";
 
 function manifest(overrides: Record<string, unknown> = {}) {
@@ -74,6 +75,35 @@ function bundle(overrides: Record<string, unknown> = {}) {
   };
 }
 
+function figure(overrides: Record<string, unknown> = {}) {
+  return {
+    figure_id: FIGURE_ID,
+    page_id: "PAGE-CPNC-2025-P0001",
+    type: "technical_diagram",
+    purpose: "Figura legacy de prueba",
+    entities: [],
+    annotations: [],
+    reconstruction: {},
+    accessibility: { summary: "Figura de prueba" },
+    ...overrides,
+  };
+}
+
+function figuresBundle(overrides: Record<string, unknown> = {}) {
+  return {
+    schema_version: "0.1.0",
+    knowledge_version: "1.0.0",
+    book_id: "cpnc-2025",
+    scope: "BOOK",
+    figures: [figure()],
+    ...overrides,
+  };
+}
+
+function emptyFiguresBundle(overrides: Record<string, unknown> = {}) {
+  return figuresBundle({ figures: [], ...overrides });
+}
+
 function step(order: number, overrides: Record<string, unknown> = {}) {
   return {
     order,
@@ -104,8 +134,8 @@ function lessonsBundle(overrides: Record<string, unknown> = {}) {
   };
 }
 
-function emptyLessonsBundle() {
-  return lessonsBundle({ lessons: [] });
+function emptyLessonsBundle(overrides: Record<string, unknown> = {}) {
+  return lessonsBundle({ lessons: [], ...overrides });
 }
 
 function fetchStub(values: Record<string, unknown>): typeof fetch {
@@ -123,21 +153,71 @@ function fetchStub(values: Record<string, unknown>): typeof fetch {
 }
 
 describe("runtime Knowledge boundary", () => {
-  it("loads valid lessons and builds a lesson index", async () => {
-    const repository = await loadKnowledge(
-      fetchStub({
+  it("loads valid figures and lessons and builds both indexes", async () => {
+    const requested: string[] = [];
+    const fetchImpl = (async (input: RequestInfo | URL) => {
+      const url = String(input);
+      requested.push(url);
+      const values: Record<string, unknown> = {
         "/knowledge/manifest.json": manifest(),
         "/knowledge/knowledge.bundle.json": bundle(),
+        "/knowledge/figures.bundle.json": figuresBundle(),
         "/knowledge/lessons.bundle.json": lessonsBundle(),
-      }),
-    );
+      };
+      const body = values[url];
+      if (body === undefined) return new Response("not found", { status: 404 });
+      return new Response(JSON.stringify(body), { status: 200 });
+    }) as typeof fetch;
 
+    const repository = await loadKnowledge(fetchImpl);
+
+    expect(requested).toEqual([
+      "/knowledge/manifest.json",
+      "/knowledge/knowledge.bundle.json",
+      "/knowledge/figures.bundle.json",
+      "/knowledge/lessons.bundle.json",
+    ]);
     expect(repository.contentById.get(CONTENT_ID)?.page_id).toBe(
       "PAGE-CPNC-2025-P0001",
     );
     expect(repository.pagesById.get("PAGE-CPNC-2025-P0001")?.pdf_page).toBe(1);
+    expect(repository.figures).toHaveLength(1);
+    expect(repository.figuresById.get(FIGURE_ID)?.purpose).toBe("Figura legacy de prueba");
     expect(repository.lessons).toHaveLength(1);
     expect(repository.lessonsById.get(LESSON_ID)?.steps).toHaveLength(5);
+  });
+
+  it.each(["1.0.0", "1.1.0"])("accepts supported runtime Knowledge %s", (version) => {
+    expect(() =>
+      buildKnowledgeRepository(
+        manifest({ knowledge_version: version }),
+        bundle({ knowledge_version: version }),
+        figuresBundle({ knowledge_version: version }),
+        emptyLessonsBundle({ knowledge_version: version }),
+      ),
+    ).not.toThrow();
+  });
+
+  it("rejects unapproved runtime Knowledge 1.2.0", () => {
+    expect(() =>
+      buildKnowledgeRepository(
+        manifest({ knowledge_version: "1.2.0" }),
+        bundle({ knowledge_version: "1.2.0" }),
+        emptyFiguresBundle({ knowledge_version: "1.2.0" }),
+        emptyLessonsBundle({ knowledge_version: "1.2.0" }),
+      ),
+    ).toThrow("knowledge_version");
+  });
+
+  it("accepts a legacy figure without render contract, camera, or layers", () => {
+    const repository = buildKnowledgeRepository(
+      manifest(),
+      bundle(),
+      figuresBundle({ figures: [figure()] }),
+      emptyLessonsBundle(),
+    );
+
+    expect(repository.figuresById.get(FIGURE_ID)?.reconstruction).toEqual({});
   });
 
   it("sorts lesson steps without synthesizing missing order values", () => {
@@ -145,6 +225,7 @@ describe("runtime Knowledge boundary", () => {
     const repository = buildKnowledgeRepository(
       manifest(),
       bundle(),
+      figuresBundle(),
       lessonsBundle({
         lessons: [
           lesson({
@@ -201,7 +282,12 @@ describe("runtime Knowledge boundary", () => {
     ],
   ])("rejects malformed lesson field %s", (_name, overrides, expectedField) => {
     expect(() =>
-      buildKnowledgeRepository(manifest(), bundle(), lessonsBundle(overrides)),
+      buildKnowledgeRepository(
+        manifest(),
+        bundle(),
+        figuresBundle(),
+        lessonsBundle(overrides),
+      ),
     ).toThrow(expectedField as string);
   });
 
@@ -210,6 +296,7 @@ describe("runtime Knowledge boundary", () => {
       buildKnowledgeRepository(
         manifest(),
         bundle(),
+        figuresBundle(),
         lessonsBundle({ lessons: [lesson(), lesson()] }),
       ),
     ).toThrow(LESSON_ID);
@@ -220,6 +307,7 @@ describe("runtime Knowledge boundary", () => {
       buildKnowledgeRepository(
         manifest(),
         bundle(),
+        figuresBundle(),
         lessonsBundle({ lessons: [lesson({ steps: [step(1), step(1)] })] }),
       ),
     ).toThrow("order");
@@ -234,6 +322,7 @@ describe("runtime Knowledge boundary", () => {
       buildKnowledgeRepository(
         manifest(),
         bundle(),
+        figuresBundle(),
         lessonsBundle({ [field]: value }),
       ),
     ).toThrow(field);
@@ -246,6 +335,7 @@ describe("runtime Knowledge boundary", () => {
       buildKnowledgeRepository(
         manifest(),
         bundle(),
+        figuresBundle(),
         lessonsBundle({
           lessons: [lesson({ source_content_ids: [missingId] })],
         }),
@@ -256,6 +346,7 @@ describe("runtime Knowledge boundary", () => {
       buildKnowledgeRepository(
         manifest(),
         bundle(),
+        figuresBundle(),
         lessonsBundle({
           lessons: [lesson({ steps: [step(1, { content_ids: [missingId] })] })],
         }),
@@ -264,7 +355,7 @@ describe("runtime Knowledge boundary", () => {
   });
 
   it.each([
-    ["knowledge_version", "1.0.1"],
+    ["knowledge_version", "1.2.0"],
     ["book_id", "other-book"],
     ["scope", "BATCH"],
     ["source_manifest_sha256", "f".repeat(64)],
@@ -273,9 +364,73 @@ describe("runtime Knowledge boundary", () => {
       buildKnowledgeRepository(
         manifest({ [field]: value }),
         bundle(),
+        emptyFiguresBundle(),
         emptyLessonsBundle(),
       ),
     ).toThrow(field);
+  });
+
+  it.each([
+    ["knowledge_version", "1.1.0"],
+    ["book_id", "other-book"],
+    ["scope", "BATCH"],
+  ])("rejects figures metadata that conflicts with manifest field %s", (field, value) => {
+    expect(() =>
+      buildKnowledgeRepository(
+        manifest(),
+        bundle(),
+        figuresBundle({ [field]: value }),
+        emptyLessonsBundle(),
+      ),
+    ).toThrow(field);
+  });
+
+  it("rejects a figures bundle whose figures field is not an array", () => {
+    expect(() =>
+      buildKnowledgeRepository(
+        manifest(),
+        bundle(),
+        figuresBundle({ figures: {} }),
+        emptyLessonsBundle(),
+      ),
+    ).toThrow("figures");
+  });
+
+  it("rejects duplicate figure IDs", () => {
+    expect(() =>
+      buildKnowledgeRepository(
+        manifest(),
+        bundle(),
+        figuresBundle({ figures: [figure(), figure()] }),
+        emptyLessonsBundle(),
+      ),
+    ).toThrow(FIGURE_ID);
+  });
+
+  it("rejects figures that reference a missing canonical page", () => {
+    const missingPage = "PAGE-CPNC-2025-P9999";
+    expect(() =>
+      buildKnowledgeRepository(
+        manifest(),
+        bundle(),
+        figuresBundle({ figures: [figure({ page_id: missingPage })] }),
+        emptyLessonsBundle(),
+      ),
+    ).toThrow(missingPage);
+  });
+
+  it("rejects lessons that reference a missing figure", () => {
+    const missingFigure = "FIG-CPNC-2025-P9999-999";
+    expect(() =>
+      buildKnowledgeRepository(
+        manifest(),
+        bundle(),
+        emptyFiguresBundle(),
+        lessonsBundle({
+          lessons: [lesson({ steps: [step(1, { figure_ids: [missingFigure] })] })],
+        }),
+      ),
+    ).toThrow(missingFigure);
   });
 
   it("rejects malformed page/content collections", () => {
@@ -283,6 +438,7 @@ describe("runtime Knowledge boundary", () => {
       buildKnowledgeRepository(
         manifest(),
         bundle({ pages: {} }),
+        emptyFiguresBundle(),
         emptyLessonsBundle(),
       ),
     ).toThrow("pages");
@@ -290,6 +446,7 @@ describe("runtime Knowledge boundary", () => {
       buildKnowledgeRepository(
         manifest(),
         bundle({ content: {} }),
+        emptyFiguresBundle(),
         emptyLessonsBundle(),
       ),
     ).toThrow("content");
@@ -300,6 +457,7 @@ describe("runtime Knowledge boundary", () => {
       buildKnowledgeRepository(
         manifest(),
         bundle({ pages: [page(), page()] }),
+        emptyFiguresBundle(),
         emptyLessonsBundle(),
       ),
     ).toThrow("PAGE-CPNC-2025-P0001");
@@ -310,6 +468,7 @@ describe("runtime Knowledge boundary", () => {
       buildKnowledgeRepository(
         manifest(),
         bundle({ content: [content(), content()] }),
+        emptyFiguresBundle(),
         emptyLessonsBundle(),
       ),
     ).toThrow(CONTENT_ID);
@@ -320,9 +479,43 @@ describe("runtime Knowledge boundary", () => {
       buildKnowledgeRepository(
         manifest(),
         bundle({ content: [content({ page_id: "PAGE-CPNC-2025-P9999" })] }),
+        emptyFiguresBundle(),
         emptyLessonsBundle(),
       ),
     ).toThrow("PAGE-CPNC-2025-P9999");
+  });
+
+  it("fails closed when figures.bundle.json cannot be fetched", async () => {
+    await expect(
+      loadKnowledge(
+        fetchStub({
+          "/knowledge/manifest.json": manifest(),
+          "/knowledge/knowledge.bundle.json": bundle(),
+          "/knowledge/lessons.bundle.json": emptyLessonsBundle(),
+        }),
+      ),
+    ).rejects.toThrow("figures.bundle.json");
+  });
+
+  it("fails closed when figures.bundle.json is invalid JSON", async () => {
+    const fetchImpl = (async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith("manifest.json")) {
+        return new Response(JSON.stringify(manifest()), { status: 200 });
+      }
+      if (url.endsWith("knowledge.bundle.json")) {
+        return new Response(JSON.stringify(bundle()), { status: 200 });
+      }
+      if (url.endsWith("figures.bundle.json")) {
+        return new Response("{not-json", { status: 200 });
+      }
+      if (url.endsWith("lessons.bundle.json")) {
+        return new Response(JSON.stringify(emptyLessonsBundle()), { status: 200 });
+      }
+      return new Response("not found", { status: 404 });
+    }) as typeof fetch;
+
+    await expect(loadKnowledge(fetchImpl)).rejects.toThrow("figures.bundle.json");
   });
 
   it("fails closed when lessons.bundle.json cannot be fetched", async () => {
@@ -331,6 +524,7 @@ describe("runtime Knowledge boundary", () => {
         fetchStub({
           "/knowledge/manifest.json": manifest(),
           "/knowledge/knowledge.bundle.json": bundle(),
+          "/knowledge/figures.bundle.json": emptyFiguresBundle(),
         }),
       ),
     ).rejects.toThrow("lessons.bundle.json");
@@ -344,6 +538,9 @@ describe("runtime Knowledge boundary", () => {
       }
       if (url.endsWith("knowledge.bundle.json")) {
         return new Response(JSON.stringify(bundle()), { status: 200 });
+      }
+      if (url.endsWith("figures.bundle.json")) {
+        return new Response(JSON.stringify(emptyFiguresBundle()), { status: 200 });
       }
       if (url.endsWith("lessons.bundle.json")) {
         return new Response("{not-json", { status: 200 });

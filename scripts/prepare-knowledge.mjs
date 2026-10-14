@@ -13,7 +13,7 @@ import { promisify } from "node:util";
 
 const execFileAsync = promisify(execFile);
 
-export const EXPECTED_KNOWLEDGE_VERSION = "1.0.0";
+export const SUPPORTED_KNOWLEDGE_VERSIONS = new Set(["1.0.0", "1.1.0"]);
 export const EXPECTED_BOOK_ID = "cpnc-2025";
 export const EXPECTED_SCOPE = "BOOK";
 export const EXPECTED_SOURCE_SHA256 = "318ceb94569608bfe062e3e50c7032edee79febf06102f7eec760769a6dfd90c";
@@ -32,8 +32,14 @@ export function validateManifest(manifest) {
     fail("manifest", "expected object");
   }
 
+  if (!SUPPORTED_KNOWLEDGE_VERSIONS.has(manifest.knowledge_version)) {
+    fail(
+      "knowledge_version",
+      `expected one of ${[...SUPPORTED_KNOWLEDGE_VERSIONS].join(", ")}`,
+    );
+  }
+
   const expected = {
-    knowledge_version: EXPECTED_KNOWLEDGE_VERSION,
     book_id: EXPECTED_BOOK_ID,
     scope: EXPECTED_SCOPE,
     source_manifest_sha256: EXPECTED_SOURCE_SHA256,
@@ -203,7 +209,7 @@ if (import.meta.url === invokedPath) {
   const generatedRoot = join(repoRoot, "generated");
   prepareKnowledge({ knowledgeRoot, generatedRoot })
     .then(() => {
-      console.log(`CarpiNova Knowledge ${EXPECTED_KNOWLEDGE_VERSION} prepared in ${join(generatedRoot, "knowledge")}`);
+      console.log(`CarpiNova Knowledge prepared in ${join(generatedRoot, "knowledge")}`);
     })
     .catch((error) => {
       console.error(error instanceof Error ? error.message : error);

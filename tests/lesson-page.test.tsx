@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import { describe, expect, it } from "vitest";
@@ -11,11 +11,14 @@ const SOURCE_SHA = "318ceb94569608bfe062e3e50c7032edee79febf06102f7eec760769a6df
 const PAGE_ID = "PAGE-CPNC-2025-P0001";
 const LESSON_ID = "LESSON-SLIDES-X-2X-PILOT";
 const LESSON_TITLE = "Calcular e instalar correderas con X y 2X";
+const FIGURE_A = "FIG-A";
+const FIGURE_LEGACY = "FIG-LEGACY";
+const FIGURE_B = "FIG-B";
 
 function manifest() {
   return {
     schema_version: "0.1.0",
-    knowledge_version: "1.0.0",
+    knowledge_version: "1.1.0",
     book_id: "cpnc-2025",
     scope: "BOOK",
     source_manifest_sha256: SOURCE_SHA,
@@ -47,16 +50,70 @@ function content(suffix: string, learningText: string) {
   };
 }
 
-function repository() {
+function renderableFigure(figureId: string, summary: string) {
+  return {
+    figure_id: figureId,
+    page_id: PAGE_ID,
+    type: "technical_diagram",
+    purpose: summary,
+    entities: [
+      {
+        id: `${figureId}-rect`,
+        type: "panel",
+        geometry: {
+          primitive: "rect",
+          precision: "approximate",
+          bounds: { x: 0.1, y: 0.1, width: 0.8, height: 0.6 },
+        },
+      },
+    ],
+    annotations: [],
+    reconstruction: { render_contract: "normalized-2d-v1" },
+    camera: {
+      coordinate_space: "normalized_figure",
+      viewport: { x: 0, y: 0, width: 1, height: 1 },
+    },
+    layers: [
+      {
+        id: "geometry",
+        order: 1,
+        entity_ids: [`${figureId}-rect`],
+      },
+    ],
+    accessibility: { summary },
+  };
+}
+
+function legacyFigure() {
+  return {
+    figure_id: FIGURE_LEGACY,
+    page_id: PAGE_ID,
+    type: "technical_diagram",
+    purpose: "Figura legacy",
+    entities: [],
+    annotations: [],
+    reconstruction: {},
+  };
+}
+
+function repository(options: { legacyOnly?: boolean } = {}) {
   const one = content("001", "Explicación del paso uno.");
   const three = content("003", "Explicación del paso tres.");
   const five = content("005", "Explicación del paso cinco.");
+
+  const figures = options.legacyOnly
+    ? [legacyFigure()]
+    : [
+        renderableFigure(FIGURE_A, "Figura A"),
+        legacyFigure(),
+        renderableFigure(FIGURE_B, "Figura B"),
+      ];
 
   return buildKnowledgeRepository(
     manifest(),
     {
       schema_version: "0.1.0",
-      knowledge_version: "1.0.0",
+      knowledge_version: "1.1.0",
       book_id: "cpnc-2025",
       scope: "BOOK",
       pages: [
@@ -77,7 +134,14 @@ function repository() {
     },
     {
       schema_version: "0.1.0",
-      knowledge_version: "1.0.0",
+      knowledge_version: "1.1.0",
+      book_id: "cpnc-2025",
+      scope: "BOOK",
+      figures,
+    },
+    {
+      schema_version: "0.1.0",
+      knowledge_version: "1.1.0",
       book_id: "cpnc-2025",
       scope: "BOOK",
       lessons: [
@@ -86,9 +150,26 @@ function repository() {
           title: LESSON_TITLE,
           source_content_ids: [one.content_id, three.content_id, five.content_id],
           steps: [
-            { order: 5, title: "Paso 5", content_ids: [five.content_id] },
-            { order: 1, title: "Paso 1", content_ids: [one.content_id] },
-            { order: 3, title: "Paso 3", content_ids: [three.content_id] },
+            {
+              order: 5,
+              title: "Paso 5",
+              content_ids: [five.content_id],
+              figure_ids: options.legacyOnly ? [FIGURE_LEGACY] : [FIGURE_B],
+            },
+            {
+              order: 1,
+              title: "Paso 1",
+              content_ids: [one.content_id],
+              figure_ids: options.legacyOnly
+                ? [FIGURE_LEGACY]
+                : [FIGURE_A, FIGURE_LEGACY],
+            },
+            {
+              order: 3,
+              title: "Paso 3",
+              content_ids: [three.content_id],
+              figure_ids: options.legacyOnly ? [FIGURE_LEGACY] : [FIGURE_A, FIGURE_B],
+            },
           ],
         },
       ],
@@ -105,9 +186,9 @@ function LocationProbe() {
   );
 }
 
-function renderAt(path: string) {
+function renderAt(path: string, options: { legacyOnly?: boolean } = {}) {
   return render(
-    <KnowledgeProvider repository={repository()}>
+    <KnowledgeProvider repository={repository(options)}>
       <MemoryRouter initialEntries={[path]}>
         <AppRoutes />
         <LocationProbe />
@@ -117,15 +198,25 @@ function renderAt(path: string) {
 }
 
 describe("guided lesson page", () => {
-  it("renders canonical lesson steps in validated order and links to canonical content", async () => {
+  it("renders support figures once in first-seen order without changing canonical lesson navigation", async () => {
     const user = userEvent.setup();
     renderAt(`/lecciones/${LESSON_ID}`);
 
     expect(
       screen.getByRole("heading", { level: 1, name: LESSON_TITLE }),
     ).toBeInTheDocument();
+
+    const supportFigures = screen.getByRole("region", { name: "Figuras de apoyo" });
     expect(
-      screen.getAllByRole("heading", { level: 2 }).map((heading) => heading.textContent),
+      within(supportFigures).getAllByRole("img").map((figure) => figure.getAttribute("aria-label")),
+    ).toEqual(["Figura A", "Figura B"]);
+    expect(within(supportFigures).getAllByRole("img", { name: "Figura A" })).toHaveLength(1);
+    expect(within(supportFigures).getAllByRole("img", { name: "Figura B" })).toHaveLength(1);
+    expect(within(supportFigures).queryByText("Figura legacy")).not.toBeInTheDocument();
+
+    const steps = screen.getByRole("list", { name: "Pasos de la lección" });
+    expect(
+      within(steps).getAllByRole("heading", { level: 2 }).map((heading) => heading.textContent),
     ).toEqual(["Paso 1", "Paso 3", "Paso 5"]);
     expect(screen.getByText("Explicación del paso uno.")).toBeInTheDocument();
 
@@ -142,6 +233,18 @@ describe("guided lesson page", () => {
     expect(screen.getByTestId("location")).toHaveTextContent(
       `"returnTo":"/lecciones/${LESSON_ID}"`,
     );
+  });
+
+  it("omits the support figure section when the lesson references only legacy figures", () => {
+    renderAt(`/lecciones/${LESSON_ID}`, { legacyOnly: true });
+
+    expect(
+      screen.queryByRole("region", { name: "Figuras de apoyo" }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("img")).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("list", { name: "Pasos de la lección" }),
+    ).toBeInTheDocument();
   });
 
   it("shows a clear not-found state for an unknown lesson id", () => {

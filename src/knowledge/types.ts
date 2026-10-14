@@ -1,6 +1,9 @@
+export type SupportedKnowledgeVersion = "1.0.0" | "1.1.0";
+export type FigurePrimitive = "rect" | "line" | "polyline";
+
 export interface KnowledgeManifest {
   schema_version: string;
-  knowledge_version: "1.0.0";
+  knowledge_version: SupportedKnowledgeVersion;
   book_id: "cpnc-2025";
   scope: "BOOK";
   source_manifest_sha256: string;
@@ -65,6 +68,82 @@ export interface KnowledgeBundle {
   taxonomy: Record<string, unknown>;
 }
 
+export interface FigurePoint {
+  x: number;
+  y: number;
+}
+
+export interface FigureBounds {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface FigurePlacement {
+  x: number;
+  y: number;
+  precision?: string;
+}
+
+export interface FigureGeometry {
+  primitive?: string | null;
+  precision?: string;
+  bounds?: FigureBounds;
+  points?: FigurePoint[];
+}
+
+export interface FigureEntity {
+  id: string;
+  type: string;
+  geometry: FigureGeometry;
+}
+
+export interface FigureAnnotation {
+  id: string;
+  text: string;
+  entity_id?: string;
+  measurement_id?: string;
+  placement?: FigurePlacement;
+}
+
+export interface FigureLayer {
+  id: string;
+  order: number;
+  entity_ids?: string[];
+  annotation_ids?: string[];
+}
+
+export interface FigureCamera {
+  coordinate_space: string;
+  viewport: FigureBounds;
+}
+
+export interface FigureReconstruction {
+  render_contract?: string;
+}
+
+export interface FigureRecord {
+  figure_id: string;
+  page_id: string;
+  type: string;
+  purpose: string;
+  entities: FigureEntity[];
+  annotations: FigureAnnotation[];
+  layers?: FigureLayer[];
+  camera?: FigureCamera;
+  reconstruction: FigureReconstruction;
+  accessibility?: { summary?: string };
+}
+
+export interface FigureBundle {
+  schema_version?: string;
+  knowledge_version?: string;
+  book_id?: string;
+  scope?: string;
+  figures: FigureRecord[];
+}
+
 export interface LessonStep {
   order: number;
   title: string;
@@ -93,6 +172,8 @@ export interface KnowledgeRepository {
   bundle: KnowledgeBundle;
   pagesById: Map<string, PageRecord>;
   contentById: Map<string, ContentRecord>;
+  figures: FigureRecord[];
+  figuresById: Map<string, FigureRecord>;
   lessons: LessonRecord[];
   lessonsById: Map<string, LessonRecord>;
 }
