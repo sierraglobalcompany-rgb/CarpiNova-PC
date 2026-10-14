@@ -40,7 +40,7 @@ function highlightTargets(
   }
 
   const rawTargets = interaction.target_entity_ids;
-  if (!Array.isArray(rawTargets)) {
+  if (!Array.isArray(rawTargets) || rawTargets.length === 0) {
     return [];
   }
 
@@ -51,10 +51,16 @@ function highlightTargets(
     }
   }
 
-  return rawTargets.filter(
-    (target): target is string =>
-      typeof target === "string" && target.trim().length > 0 && allowed.has(target),
-  );
+  if (
+    !rawTargets.every(
+      (target) =>
+        typeof target === "string" && target.trim().length > 0 && allowed.has(target),
+    )
+  ) {
+    return [];
+  }
+
+  return rawTargets as string[];
 }
 
 function measurementHighlightTargets(
@@ -67,7 +73,7 @@ function measurementHighlightTargets(
   }
 
   const rawTargets = interaction.measurement_ids;
-  if (!Array.isArray(rawTargets)) {
+  if (!Array.isArray(rawTargets) || rawTargets.length === 0) {
     return [];
   }
 
@@ -80,10 +86,16 @@ function measurementHighlightTargets(
     }
   }
 
-  return rawTargets.filter(
-    (target): target is string =>
-      typeof target === "string" && target.trim().length > 0 && allowed.has(target),
-  );
+  if (
+    !rawTargets.every(
+      (target) =>
+        typeof target === "string" && target.trim().length > 0 && allowed.has(target),
+    )
+  ) {
+    return [];
+  }
+
+  return rawTargets as string[];
 }
 
 function identifiedParts(step: LessonStep): IdentifiedPart[] {
