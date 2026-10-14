@@ -16,6 +16,10 @@ const FIGURE_LEGACY = "FIG-LEGACY";
 const FIGURE_B = "FIG-B";
 const MEASUREMENT_A = "MEAS-A";
 const MEASUREMENT_B = "MEAS-B";
+const GUIDED_MEASUREMENT_X = "MEAS-GUIDED-X";
+const GUIDED_MEASUREMENT_2X = "MEAS-GUIDED-2X";
+const GUIDED_MEASUREMENT_37 = "MEAS-GUIDED-37";
+const GUIDED_MEASUREMENT_REPEAT_2X = "MEAS-GUIDED-REPEAT-2X";
 
 type RepositoryOptions = {
   legacyOnly?: boolean;
@@ -127,7 +131,9 @@ function repository(options: RepositoryOptions = {}) {
   const one = content("001", "Explicación del paso uno.");
   const three = content("003", "Explicación del paso tres.");
   const four = content("004", "Explicación del paso cuatro.");
-  const five = content("005", "Explicación del paso cinco.");
+  const five = content("005", "Usa X para la gaveta y 2X para el lateral.");
+  const six = content("006", "Comienza con 37 mm desde el frente del mueble.");
+  const seven = content("007", "Repite 2X para la siguiente gaveta.");
 
   const figures = options.legacyOnly
     ? [legacyFigure()]
@@ -155,8 +161,13 @@ function repository(options: RepositoryOptions = {}) {
           section: "Correderas",
         },
       ],
-      content: [one, three, four, five],
-      measurements: [],
+      content: [one, three, four, five, six, seven],
+      measurements: [
+        { measurement_id: GUIDED_MEASUREMENT_X },
+        { measurement_id: GUIDED_MEASUREMENT_2X },
+        { measurement_id: GUIDED_MEASUREMENT_37 },
+        { measurement_id: GUIDED_MEASUREMENT_REPEAT_2X },
+      ],
       rules: [],
       taxonomy: {},
     },
@@ -181,13 +192,37 @@ function repository(options: RepositoryOptions = {}) {
             three.content_id,
             four.content_id,
             five.content_id,
+            six.content_id,
+            seven.content_id,
           ],
           steps: [
             {
               order: 5,
               title: "Paso 5",
-              content_ids: [five.content_id],
+              content_ids: [five.content_id, six.content_id, seven.content_id],
               figure_ids: options.legacyOnly ? [FIGURE_LEGACY] : [FIGURE_B],
+              interaction: options.legacyOnly
+                ? undefined
+                : {
+                    type: "guided_sequence",
+                    sequence: [
+                      {
+                        order: 1,
+                        content_id: five.content_id,
+                        measurement_ids: [GUIDED_MEASUREMENT_X, GUIDED_MEASUREMENT_2X],
+                      },
+                      {
+                        order: 2,
+                        content_id: six.content_id,
+                        measurement_ids: [GUIDED_MEASUREMENT_37],
+                      },
+                      {
+                        order: 3,
+                        content_id: seven.content_id,
+                        measurement_ids: [GUIDED_MEASUREMENT_REPEAT_2X],
+                      },
+                    ],
+                  },
             },
             {
               order: 1,
@@ -408,6 +443,34 @@ describe("guided lesson page", () => {
       "Parte gruesa: costado interno del mueble",
     ]);
     expect(geometry).not.toHaveAttribute("data-highlighted", "true");
+  });
+
+  it("reveals the three canonical sequence items in order without exposing technical ids", async () => {
+    const user = userEvent.setup();
+    renderAt(`/lecciones/${LESSON_ID}`);
+
+    const stepFive = screen.getByRole("heading", { level: 2, name: "Paso 5" }).closest("section");
+    expect(stepFive).not.toBeNull();
+    expect(
+      within(stepFive as HTMLElement).queryByRole("list", { name: "Secuencia guiada" }),
+    ).not.toBeInTheDocument();
+
+    await user.click(
+      within(stepFive as HTMLElement).getByRole("button", { name: "Ver secuencia" }),
+    );
+
+    const sequence = within(stepFive as HTMLElement).getByRole("list", {
+      name: "Secuencia guiada",
+    });
+    expect(
+      within(sequence).getAllByRole("listitem").map((item) => item.textContent),
+    ).toEqual([
+      "Usa X para la gaveta y 2X para el lateral.",
+      "Comienza con 37 mm desde el frente del mueble.",
+      "Repite 2X para la siguiente gaveta.",
+    ]);
+    expect(sequence).not.toHaveTextContent(GUIDED_MEASUREMENT_X);
+    expect(sequence).not.toHaveTextContent(GUIDED_MEASUREMENT_37);
   });
 
   it("omits the support figure section when the lesson references only legacy figures", () => {
