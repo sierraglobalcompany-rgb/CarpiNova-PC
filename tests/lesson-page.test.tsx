@@ -14,6 +14,8 @@ const LESSON_TITLE = "Calcular e instalar correderas con X y 2X";
 const FIGURE_A = "FIG-A";
 const FIGURE_LEGACY = "FIG-LEGACY";
 const FIGURE_B = "FIG-B";
+const MEASUREMENT_A = "MEAS-A";
+const MEASUREMENT_B = "MEAS-B";
 
 function manifest() {
   return {
@@ -51,6 +53,7 @@ function content(suffix: string, learningText: string) {
 }
 
 function renderableFigure(figureId: string, summary: string) {
+  const isFigureA = figureId === FIGURE_A;
   return {
     figure_id: figureId,
     page_id: PAGE_ID,
@@ -67,7 +70,24 @@ function renderableFigure(figureId: string, summary: string) {
         },
       },
     ],
-    annotations: [],
+    annotations: isFigureA
+      ? [
+          {
+            id: "ann-measurement-a",
+            text: "Holgura A",
+            measurement_id: MEASUREMENT_A,
+            entity_id: `${figureId}-rect`,
+            placement: { x: 0.2, y: 0.7, precision: "approximate" },
+          },
+          {
+            id: "ann-measurement-b",
+            text: "Holgura B",
+            measurement_id: MEASUREMENT_B,
+            entity_id: `${figureId}-rect`,
+            placement: { x: 0.2, y: 0.8, precision: "approximate" },
+          },
+        ]
+      : [],
     reconstruction: { render_contract: "normalized-2d-v1" },
     camera: {
       coordinate_space: "normalized_figure",
@@ -78,6 +98,7 @@ function renderableFigure(figureId: string, summary: string) {
         id: "geometry",
         order: 1,
         entity_ids: [`${figureId}-rect`],
+        annotation_ids: isFigureA ? ["ann-measurement-a", "ann-measurement-b"] : [],
       },
     ],
     accessibility: { summary },
@@ -175,6 +196,12 @@ function repository(options: { legacyOnly?: boolean } = {}) {
               title: "Paso 3",
               content_ids: [three.content_id],
               figure_ids: options.legacyOnly ? [FIGURE_LEGACY] : [FIGURE_A, FIGURE_B],
+              interaction: options.legacyOnly
+                ? undefined
+                : {
+                    type: "highlight_measurements",
+                    target_measurement_ids: [MEASUREMENT_A, MEASUREMENT_B],
+                  },
             },
           ],
         },
@@ -263,6 +290,29 @@ describe("guided lesson page", () => {
     expect(target).toHaveAttribute("y", "100");
     expect(target).toHaveAttribute("width", "800");
     expect(target).toHaveAttribute("height", "600");
+  });
+
+  it("highlights only canonical measurement annotations and preserves their placement", async () => {
+    const user = userEvent.setup();
+    renderAt(`/lecciones/${LESSON_ID}`);
+
+    const figureA = screen.getByRole("img", { name: "Figura A" });
+    const measurementA = within(figureA).getByText("Holgura A");
+    const measurementB = within(figureA).getByText("Holgura B");
+
+    expect(measurementA).not.toHaveAttribute("data-highlighted", "true");
+    expect(measurementB).not.toHaveAttribute("data-highlighted", "true");
+
+    const stepThree = screen.getByRole("heading", { level: 2, name: "Paso 3" }).closest("section");
+    expect(stepThree).not.toBeNull();
+    await user.click(within(stepThree as HTMLElement).getByRole("button", { name: "Resaltar medidas" }));
+
+    expect(measurementA).toHaveAttribute("data-highlighted", "true");
+    expect(measurementB).toHaveAttribute("data-highlighted", "true");
+    expect(measurementA).toHaveAttribute("x", "200");
+    expect(measurementA).toHaveAttribute("y", "700");
+    expect(measurementB).toHaveAttribute("x", "200");
+    expect(measurementB).toHaveAttribute("y", "800");
   });
 
   it("omits the support figure section when the lesson references only legacy figures", () => {
