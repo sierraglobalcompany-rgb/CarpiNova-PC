@@ -200,7 +200,7 @@ function repository(options: { legacyOnly?: boolean } = {}) {
                 ? undefined
                 : {
                     type: "highlight_measurements",
-                    target_measurement_ids: [MEASUREMENT_A, MEASUREMENT_B],
+                    measurement_ids: [MEASUREMENT_A, MEASUREMENT_B],
                   },
             },
           ],
