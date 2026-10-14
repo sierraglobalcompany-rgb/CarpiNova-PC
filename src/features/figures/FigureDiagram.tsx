@@ -27,8 +27,14 @@ function compareLayerIds(left: string, right: string): number {
 
 function renderEntity(
   entity: FigureRecord["entities"][number],
+  highlighted: boolean,
 ): ReactElement {
   const { geometry } = entity;
+  const highlightProps = {
+    "data-highlighted": highlighted ? "true" : undefined,
+    strokeWidth: highlighted ? 6 : 2,
+  };
+
   switch (geometry.primitive) {
     case "rect": {
       if (geometry.bounds === undefined) {
@@ -43,7 +49,7 @@ function renderEntity(
           height={scaled(geometry.bounds.height, `${entity.id}.bounds.height`)}
           fill="none"
           stroke="currentColor"
-          strokeWidth={2}
+          {...highlightProps}
         />
       );
     }
@@ -61,7 +67,7 @@ function renderEntity(
           y2={scaled(end.y, `${entity.id}.points[1].y`)}
           fill="none"
           stroke="currentColor"
-          strokeWidth={2}
+          {...highlightProps}
         />
       );
     }
@@ -84,7 +90,7 @@ function renderEntity(
           points={points}
           fill="none"
           stroke="currentColor"
-          strokeWidth={2}
+          {...highlightProps}
         />
       );
     }
@@ -115,8 +121,10 @@ function renderAnnotation(
 
 export function FigureDiagram({
   figure,
+  highlightedEntityIds = [],
 }: {
   figure: FigureRecord;
+  highlightedEntityIds?: readonly string[];
 }): ReactElement {
   if (figure.reconstruction.render_contract !== "normalized-2d-v1") {
     throw new Error("FigureDiagram requires normalized-2d-v1");
@@ -125,6 +133,7 @@ export function FigureDiagram({
     throw new Error("FigureDiagram requires non-empty layers");
   }
 
+  const highlighted = new Set(highlightedEntityIds);
   const entitiesById = new Map(figure.entities.map((entity) => [entity.id, entity] as const));
   const annotationsById = new Map(
     figure.annotations.map((annotation) => [annotation.id, annotation] as const),
@@ -141,7 +150,7 @@ export function FigureDiagram({
       if (entity === undefined) {
         throw new Error(`Figure layer ${layer.id} references missing entity ${entityId}`);
       }
-      elements.push(renderEntity(entity));
+      elements.push(renderEntity(entity, highlighted.has(entity.id)));
     }
     for (const annotationId of layer.annotation_ids ?? []) {
       const annotation = annotationsById.get(annotationId);
